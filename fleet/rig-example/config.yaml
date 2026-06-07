@@ -1,0 +1,26 @@
+# GitMine TTY — Example Rig Config
+# Copy this to fleet/<your-rig-id>/config.yaml and edit
+miner:
+  algo: "scrypt"            # Override fleet default
+  intensity: 95
+  threads: 0
+  gpu_devices: [0, 1]
+  cpu_affinity: ""
+  env:
+    GPU_MAX_ALLOC_PERCENT: "100"
+
+payout:
+  address: "REPLACE_WITH_YOUR_TTY_ADDRESS"
+  threshold: 100
+
+monitoring:
+  heartbeat_interval: 30
+  temp_limit_gpu: 80
+  temp_limit_cpu: 75
+  watchdog: true
+  offline_alert_after: 90
+
+fennec:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8765

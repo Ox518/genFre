@@ -1,9 +1,22 @@
 # GitMine TTY — Payout Configuration
-
 payouts:
-  method: "PPLNS"            # PPLNS | PPS | PROP
-  pplns_window: 100          # Last N shares for PPLNS
-  tx_fee: 0.001              # TTY fee per payout tx
-  consolidate_outputs: true  # Batch multiple miners into one tx
-  rpc_broadcast_url: "https://explorer.trinity-coin.org/api/sendtx"  # Public RPC fallback
-  require_signatures: 1      # WebAuthn signatures required to release payout
+  threshold: 100.0         # Minimum TTY to trigger payout
+  fee_reserve: 0.1         # TTY kept per tx for network fee
+  schedule: "on-threshold" # on-threshold | hourly | daily | manual
+  method: "pplns"          # pplns | prop | solo
+  pplns_window: 2016       # shares in PPLNS window
+
+  # Multisig signing requirements
+  signing:
+    required: 1             # of-N (set to 2 for multisig)
+    total: 1
+    # Add WebAuthn public key fingerprints of signers here
+    signers: []
+
+  rpc_broadcast:
+    # Use public Trinity RPC nodes (no local wallet needed)
+    endpoints:
+      - "http://node1.trinity-rpc.example.com"
+      - "http://node2.trinity-rpc.example.com"
+    fallback_enabled: true
+    timeout_seconds: 30

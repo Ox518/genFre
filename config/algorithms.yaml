@@ -1,36 +1,40 @@
-# Trinity TTY — Algorithm Configuration
-# Three PoW algorithms: sha256d, scrypt, myr-groestl
-# Pool rotates per block based on selection_mode below.
-
-selection_mode: "round_robin"   # round_robin | profitability | fixed
-fixed_algo: "scrypt"            # Only used when selection_mode = fixed
-
+# GitMine TTY — Algorithm Configuration (Trinity multi-algo)
 algorithms:
   sha256d:
     enabled: true
+    display_name: "SHA256d"
+    target_hardware: "ASIC"
     difficulty: 500000
-    target_block_time: 120        # seconds
-    max_difficulty: 10000000
-    min_difficulty: 10000
-    share_validation: "sha256d"   # validation function key
+    difficulty_adjust_blocks: 10
+    nonce_offset: 72        # byte offset in 80-byte header
+    nonce_length: 8
+    hash_byte_order: "little-endian"
+    color: "#f7931a"
 
   scrypt:
     enabled: true
+    display_name: "Scrypt"
+    target_hardware: "GPU/ASIC"
     difficulty: 12000
-    target_block_time: 120
-    max_difficulty: 1000000
-    min_difficulty: 1000
-    scrypt_params:
+    difficulty_adjust_blocks: 10
+    params:
       N: 1024
       r: 1
       p: 1
       dklen: 32
-    share_validation: "scrypt"
+    nonce_offset: 72
+    nonce_length: 8
+    hash_byte_order: "little-endian"
+    color: "#2c9fdd"
 
   myr-groestl:
     enabled: true
+    display_name: "Myr-Groestl"
+    target_hardware: "GPU/CPU"
     difficulty: 8000
-    target_block_time: 120
-    max_difficulty: 500000
-    min_difficulty: 500
-    share_validation: "myr_groestl"
+    difficulty_adjust_blocks: 10
+    groestl_bits: 512       # Groestl-512 truncated to 32 bytes
+    nonce_offset: 72
+    nonce_length: 8
+    hash_byte_order: "little-endian"
+    color: "#8b5cf6"

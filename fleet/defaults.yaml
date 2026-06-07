@@ -1,0 +1,28 @@
+# GitMine TTY — Fleet-Wide Defaults (per-rig config overrides these)
+defaults:
+  miner:
+    algo: "auto"            # auto | sha256d | scrypt | myr-groestl
+    intensity: 90           # CPU/GPU intensity %
+    threads: 0              # 0 = auto-detect (all cores)
+    gpu_devices: []         # [] = all GPUs
+    cpu_affinity: ""        # "" = no affinity pinning
+    env:
+      GPU_MAX_ALLOC_PERCENT: "100"
+      GPU_USE_SYNC_OBJECTS: "1"
+
+  payout:
+    address: ""             # Must be set per-rig — overrides fleet default
+    threshold: 100          # TTY before requesting payout
+
+  monitoring:
+    heartbeat_interval: 30  # seconds between heartbeat commits
+    temp_limit_gpu: 80      # °C — auto-throttle above this
+    temp_limit_cpu: 75      # °C
+    watchdog: true          # restart miner process on crash
+    offline_alert_after: 90 # seconds without heartbeat = STALE
+
+  fennec:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8765
+    reconnect_interval: 5   # seconds before reconnect attempt

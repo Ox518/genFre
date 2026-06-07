@@ -1,0 +1,13 @@
+# GitMine TTY — Rig Metadata (informational, not used by pool logic)
+rig:
+  id: "rig-example"
+  owner: ""
+  label: "Example Rig"
+  location: ""
+  hardware:
+    cpu: ""
+    gpu: []
+    ram_gb: 0
+  os: "Ubuntu 24.04"
+  notes: "Replace this file with your rig's actual specs"
+  registered_at: "2026-06-06"
