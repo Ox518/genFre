@@ -1,5 +1,5 @@
 # GitMine — Dual-Coin Pool Configuration
-# Coins: Fennec (FNNC) + Trinity (TTY)
+# Coins: Fennec (FNNC/YescryptR16) + Trinity (TTY/SHA256d)
 
 pool:
   name: "GitMine"
@@ -11,35 +11,35 @@ coins:
   fnnc:
     ticker: "FNNC"
     name: "Fennec"
-    address: "${FNNC_POOL_ADDRESS}"   # GitHub Secret: FNNC_POOL_ADDRESS
+    address: "${FNNC_POOL_ADDRESS}"   # GitHub Secret — your Fennec payout address
     fee_percent: 1.0
     network: "mainnet"
+    algo: "yescryptr16"
     rpc:
       host: "127.0.0.1"
       port: 8339
       user: "fnncpool"
-      password: "${FNNC_RPC_PASS}"    # GitHub Secret: FNNC_RPC_PASS
-    algo: "yescryptr16"
+      pass: "gitmine-fnnc-rpc-2026"   # Internal only — loopback, not exposed
 
   tty:
     ticker: "TTY"
     name: "Trinity"
-    address: "${TTY_POOL_ADDRESS}"    # GitHub Secret: TTY_POOL_ADDRESS
+    address: "${TTY_POOL_ADDRESS}"    # GitHub Secret — your Trinity payout address
     fee_percent: 1.0
     network: "mainnet"
+    algo: "sha256d"
     rpc:
       host: "127.0.0.1"
       port: 12345
       user: "ttypool"
-      password: "${TTY_RPC_PASS}"     # GitHub Secret: TTY_RPC_PASS
-    algo: "sha256d"
+      pass: "gitmine-tty-rpc-2026"    # Internal only — loopback, not exposed
 
 operator:
   relay_host: "0.0.0.0"
   relay_port: 8765
 
 template:
-  ttl: 30              # seconds before template expires
+  ttl: 30
   refresh_cron: "*/2 * * * *"
 
 shares:
@@ -47,4 +47,4 @@ shares:
   branch_accepted: "shares-accepted"
   branch_rejected: "shares-rejected"
   max_per_commit: 10
-  batch_interval: 5    # seconds between pushes from miner
+  batch_interval: 5
