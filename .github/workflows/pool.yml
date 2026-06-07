@@ -1,30 +1,42 @@
-name: GitMine TTY Pool Operator
+name: GitMine TTY — Pool Operator
 
 on:
   schedule:
-    - cron: '*/2 * * * *'      # Every 2 minutes: refresh templates, validate shares
+    - cron: '*/2 * * * *'       # Template refresh every 2 minutes
   push:
     branches:
-      - shares-pending           # Triggered when miners push shares
-      - 'fleet/**'               # Triggered when fleet config changes
-  workflow_dispatch: {}          # Manual trigger
+      - shares-pending           # Trigger immediately on new shares
+      - 'fleet/**/heartbeat'     # Trigger on rig heartbeats
+  workflow_dispatch:             # Manual trigger
+    inputs:
+      force_payout:
+        description: 'Force payout processing regardless of threshold'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   pages: write
   id-token: write
 
-env:
-  PYTHON_VERSION: '3.12'
+concurrency:
+  group: pool-operator
+  cancel-in-progress: false    # Never cancel mid-run — share validation must complete
 
 jobs:
   operate:
-    name: Pool Operator
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      TRINITY_RPC_PORT: 12345
+      TRINITY_RPC_USER: ttypool
+      TRINITY_RPC_PASS: ${{ secrets.TRINITY_RPC_PASS }}
+      POOL_ADDRESS: ${{ secrets.POOL_ADDRESS }}
+      FENNEC_SECRET: ${{ secrets.FENNEC_SECRET }}
+      FENNEC_URL: ${{ secrets.FENNEC_URL }}
 
     steps:
-      - name: Checkout repo (full history for branch ops)
+      - name: Checkout repo (full history for share branch inspection)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -33,125 +45,101 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
+          python-version: '3.12'
+          cache: 'pip'
 
-      - name: Install Python dependencies
-        run: pip install -r scripts/requirements.txt
+      - name: Install pool operator dependencies
+        run: |
+          pip install \  
+            pyyaml \          # Config parsing
+            requests \        # RPC calls
+            python-bitcoinrpc \  # Trinity RPC client
+            py-scrypt \       # Scrypt validation
+            pygroestl \       # Myr-Groestl validation
+            pynacl            # Ed25519 signature verification
 
-      - name: Build Trinity Daemon (cached)
-        id: trinityd
+      - name: Cache Trinity daemon binary
         uses: actions/cache@v4
+        id: trinityd-cache
         with:
-          path: bin/trinityd
-          key: trinityd-${{ hashFiles('scripts/build-trinityd.sh') }}
-      - name: Build trinityd if not cached
-        if: steps.trinityd.outputs.cache-hit != 'true'
-        run: bash scripts/build-trinityd.sh
+          path: ~/.trinityd/trinityd
+          key: trinityd-v1.0-${{ runner.os }}
 
-      - name: Start Trinity Daemon (pruned, 100 blocks)
+      - name: Build Trinity daemon (if not cached)
+        if: steps.trinityd-cache.outputs.cache-hit != 'true'
         run: |
-          mkdir -p ~/.trinity
-          cat > ~/.trinity/trinity.conf << EOF
-          rpcuser=${{ secrets.TTY_RPC_USER }}
-          rpcpassword=${{ secrets.TTY_RPC_PASS }}
-          rpcbind=127.0.0.1
-          rpcport=12345
-          prune=550
-          daemon=1
-          EOF
-          ./bin/trinityd -datadir=$HOME/.trinity -conf=$HOME/.trinity/trinity.conf
-          echo "Waiting for daemon sync..."
-          sleep 20
+          sudo apt-get install -y build-essential libssl-dev libboost-all-dev libdb++-dev
+          # Build from source (pinned commit)
+          git clone --depth 1 https://github.com/REPLACE_WITH_TRINITY_REPO trinityd-src
+          cd trinityd-src && ./autogen.sh && ./configure --with-incompatible-bdb --without-gui
+          make -j$(nproc)
+          mkdir -p ~/.trinityd && cp src/trinityd ~/.trinityd/
 
-      - name: Fetch Block Templates (all algos)
+      - name: Start Trinity daemon (pruned, 550 blocks)
         run: |
-          python scripts/fetch_templates.py \
-            --rpc-host 127.0.0.1 \
-            --rpc-port 12345 \
-            --rpc-user ${{ secrets.TTY_RPC_USER }} \
-            --rpc-pass ${{ secrets.TTY_RPC_PASS }} \
-            --algos sha256d,scrypt,myr-groestl \
-            --output-dir state/templates/
+          ~/.trinityd/trinityd \
+            -prune=550 \
+            -sync-pruned-blocks \
+            -rpcbind=127.0.0.1 \
+            -rpcport=${{ env.TRINITY_RPC_PORT }} \
+            -rpcuser=${{ env.TRINITY_RPC_USER }} \
+            -rpcpassword=${{ env.TRINITY_RPC_PASS }} \
+            -daemon
+          # Wait for RPC to be ready (up to 60s)
+          for i in $(seq 1 12); do
+            sleep 5
+            ~/.trinityd/trinityd-cli -rpcport=${{ env.TRINITY_RPC_PORT }} \
+              -rpcuser=${{ env.TRINITY_RPC_USER }} -rpcpassword=${{ env.TRINITY_RPC_PASS }} \
+              getblockcount && break || true
+          done
 
-      - name: Select Active Template (round-robin / profitability)
+      - name: Fetch block templates for all algos
+        run: python scripts/fetch_templates.py
+
+      - name: Select and publish active template
+        run: python scripts/select_template.py
+
+      - name: Validate pending shares
+        run: python scripts/validate_shares.py
+
+      - name: Update aggregated pool stats
+        run: python scripts/update_stats.py
+
+      - name: Process payouts
         run: |
-          python scripts/select_template.py \
-            --templates-dir state/templates/ \
-            --algo-config config/algorithms.yaml \
-            --stats-file state/stats.json \
-            --output docs/template.json
+          FORCE_PAYOUT=${{ inputs.force_payout || 'false' }} \
+            python scripts/process_payouts.py
 
-      - name: Validate Pending Shares
-        run: |
-          git fetch origin shares-pending || true
-          git fetch origin shares-accepted || true
-          git fetch origin shares-rejected || true
-          python scripts/validate_shares.py \
-            --template docs/template.json \
-            --algo-config config/algorithms.yaml \
-            --pending-ref origin/shares-pending \
-            --accepted-ref shares-accepted \
-            --rejected-ref shares-rejected
-
-      - name: Update Pool Statistics
-        run: |
-          python scripts/update_stats.py \
-            --accepted-ref shares-accepted \
-            --pool-config config/pool.yaml \
-            --algo-config config/algorithms.yaml \
-            --output-stats docs/stats.json \
-            --output-state state/stats.json
-
-      - name: Process Payouts
-        run: |
-          python scripts/process_payouts.py \
-            --stats state/stats.json \
-            --payout-config config/payouts.yaml \
-            --pool-address ${{ secrets.POOL_ADDRESS }} \
-            --rpc-host 127.0.0.1 \
-            --rpc-port 12345 \
-            --rpc-user ${{ secrets.TTY_RPC_USER }} \
-            --rpc-pass ${{ secrets.TTY_RPC_PASS }} \
-            --pending-dir payouts/pending/
-
-      - name: Monitor Fleet Heartbeats
-        run: |
-          python scripts/monitor_fleet.py \
-            --fleet-dir fleet/ \
-            --stats-output state/fleet_status.json \
-            --stale-threshold 90
-
-      - name: Commit Updated State
+      - name: Commit updated state to main
         run: |
           git config user.name "gitmine-bot"
-          git config user.email "gitmine-bot@users.noreply.github.com"
-          git add docs/ state/ payouts/pending/ || true
-          git diff --staged --quiet || git commit -m "chore: pool update $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git config user.email "bot@gitmine-tty"
+          git add docs/template.json docs/stats.json docs/payouts.json state/ payouts/ || true
+          git diff --staged --quiet || git commit -m "pool: state update $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           git push origin main
 
-      - name: Tag Template (signed, immutable)
+      - name: Create signed template tag
         run: |
           HEIGHT=$(python -c "import json; print(json.load(open('docs/template.json'))['height'])")
           ALGO=$(python -c "import json; print(json.load(open('docs/template.json'))['algo'])")
           TAG="template-${ALGO}-${HEIGHT}"
-          git tag "$TAG" -m "Block template: $ALGO @ height $HEIGHT" 2>/dev/null || true
+          # Only tag if it doesn't exist
+          git tag "$TAG" 2>/dev/null || true
           git push origin "$TAG" 2>/dev/null || true
 
-      - name: Deploy Dashboard to GitHub Pages
+      - name: Notify Fennec bridge (self-hosted real-time)
+        if: env.FENNEC_URL != ''
+        run: |
+          HEIGHT=$(python -c "import json; print(json.load(open('docs/template.json'))['height'])")
+          ALGO=$(python -c "import json; print(json.load(open('docs/template.json'))['algo'])")
+          curl -s -X POST "${{ env.FENNEC_URL }}/broadcast" \
+            -H "Authorization: Bearer ${{ env.FENNEC_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"type\":\"state_update\",\"algo\":\"${ALGO}\",\"height\":${HEIGHT}}" || true
+          # Non-fatal: pool still operates if Fennec is offline
+
+      - name: Deploy dashboard to GitHub Pages
         uses: actions/deploy-pages@v4
         with:
           path: docs
-        continue-on-error: true
-
-      - name: Broadcast State Update (Cloudflare Worker)
-        if: env.WORKER_SECRET != ''
-        env:
-          WORKER_SECRET: ${{ secrets.WORKER_SECRET }}
-        run: |
-          HEIGHT=$(python -c "import json; print(json.load(open('docs/template.json'))['height'])" 2>/dev/null || echo 0)
-          ALGO=$(python -c "import json; print(json.load(open('docs/template.json'))['algo'])" 2>/dev/null || echo unknown)
-          curl -s -X POST https://gitmine-tty.workers.dev/broadcast \
-            -H "Authorization: Bearer $WORKER_SECRET" \
-            -H "Content-Type: application/json" \
-            -d "{\"type\":\"state_update\",\"algo\":\"$ALGO\",\"height\":$HEIGHT}" || true
+        continue-on-error: true  # Non-fatal if Pages not enabled yet

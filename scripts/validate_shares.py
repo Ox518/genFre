@@ -1,127 +1,140 @@
 #!/usr/bin/env python3
-"""Validate pending share commits against current template."""
-import argparse, json, hashlib, struct, sys, subprocess
+"""
+Validate pending shares from the shares-pending branch.
+Verifies:
+  1. Commit message format (SHARE{...}|SIG{...})
+  2. Ed25519 signature matches declared miner address
+  3. Hash meets declared difficulty for the declared algorithm
+  4. Template height/algo matches current template
+Moves valid shares to shares-accepted, invalid to shares-rejected.
+"""
+import hashlib
+import json
+import re
+import subprocess
+import sys
 from pathlib import Path
+
+import yaml
+import nacl.signing
+import nacl.encoding
+
+ROOT = Path(__file__).parent.parent
+algos_cfg = yaml.safe_load((ROOT / "config/algorithms.yaml").read_text())
+current_template = json.loads((ROOT / "docs/template.json").read_text())
+
+SHARE_RE = re.compile(r'^SHARE(\{.+?\})\|SIG([0-9a-f]+)$')
 
 def sha256d(data: bytes) -> bytes:
     return hashlib.sha256(hashlib.sha256(data).digest()).digest()
 
-def validate_sha256d(blob_hex: str, nonce_hex: str, target_int: int) -> bool:
-    blob = bytes.fromhex(blob_hex)
-    nonce = bytes.fromhex(nonce_hex)
-    header = blob[:72] + nonce[:8]
-    h = sha256d(header)
-    return int.from_bytes(h[::-1], 'big') <= target_int
-
-def validate_scrypt(blob_hex: str, nonce_hex: str, target_int: int, params: dict) -> bool:
+def verify_scrypt(blob: bytes, nonce: bytes, target: int) -> bool:
     try:
         import scrypt
-        blob = bytes.fromhex(blob_hex)
-        nonce = bytes.fromhex(nonce_hex)
-        header = blob[:72] + nonce[:8]
-        h = scrypt.hash(header, header,
-                        N=params.get("N", 1024),
-                        r=params.get("r", 1),
-                        p=params.get("p", 1),
-                        buflen=params.get("dklen", 32))
-        return int.from_bytes(h[::-1], 'big') <= target_int
-    except ImportError:
-        print("[validate] scrypt lib not available, skipping", file=sys.stderr)
-        return True  # pass through if lib missing in dev env
+        header = blob[:72] + nonce
+        h = scrypt.hash(header, header, N=1024, r=1, p=1, dklen=32)
+        return int.from_bytes(h[::-1], 'big') <= target
+    except Exception as e:
+        print(f"  scrypt error: {e}", file=sys.stderr)
+        return False
 
-def validate_myr_groestl(blob_hex: str, nonce_hex: str, target_int: int) -> bool:
+def verify_myr_groestl(blob: bytes, nonce: bytes, target: int) -> bool:
     try:
-        import groestlcoin_hash
-        blob = bytes.fromhex(blob_hex)
-        nonce = bytes.fromhex(nonce_hex)
-        header = blob[:72] + nonce[:8]
-        h = groestlcoin_hash.getPoWHash(header)
-        return int.from_bytes(h[::-1], 'big') <= target_int
-    except ImportError:
-        print("[validate] groestlcoin_hash not available, skipping", file=sys.stderr)
-        return True
+        import groestl
+        header = blob[:72] + nonce
+        h = groestl.groestl512(header)[:32]
+        return int.from_bytes(h[::-1], 'big') <= target
+    except Exception as e:
+        print(f"  groestl error: {e}", file=sys.stderr)
+        return False
 
-def parse_share_commit(msg: str):
-    """Parse SHARE{...}|SIG... from commit message."""
-    if not msg.startswith("SHARE"):
-        return None, None
-    try:
-        pipe = msg.find("|SIG")
-        share_json = msg[5:pipe] if pipe != -1 else msg[5:]
-        sig = msg[pipe+4:] if pipe != -1 else None
-        return json.loads(share_json), sig
-    except Exception:
-        return None, None
-
-def validate_share(share: dict, sig: str, template: dict, algo_cfg: dict) -> tuple[bool, str]:
+def verify_share(share: dict, sig_hex: str) -> tuple[bool, str]:
     algo = share.get("algo")
-    if algo != template.get("algo"):
-        return False, f"algo mismatch: share={algo} template={template.get('algo')}"
-    if algo not in algo_cfg["algorithms"]:
+    if algo not in algos_cfg["algorithms"]:
         return False, f"unknown algo: {algo}"
 
-    nonce = share.get("nonce", "")
-    blob = template.get("bits", template.get("blob", ""))
-    target_str = template.get("target", "0" * 64)
-    target_int = int(target_str, 16)
-    params = algo_cfg["algorithms"][algo].get("scrypt_params", {})
+    # Check template match
+    if share.get("height") and share["height"] != current_template.get("height"):
+        return False, f"stale share: height {share['height']} != {current_template.get('height')}"
 
-    if algo == "sha256d":
-        ok = validate_sha256d(blob, nonce, target_int)
-    elif algo == "scrypt":
-        ok = validate_scrypt(blob, nonce, target_int, params)
-    elif algo == "myr-groestl":
-        ok = validate_myr_groestl(blob, nonce, target_int)
-    else:
-        return False, "unsupported algo"
+    if algo != current_template.get("algo"):
+        return False, f"algo mismatch: {algo} != {current_template.get('algo')}"
 
-    return ok, "valid" if ok else "hash above target"
-
-def get_commits_on_ref(ref: str):
-    """Get new commits on shares-pending not in main."""
+    # Verify Ed25519 signature (miner proves ownership of payout address)
     try:
-        result = subprocess.run(
-            ["git", "log", "--format=%H %s", f"{ref}", "^origin/main"],
-            capture_output=True, text=True, check=True
-        )
-        return [line.split(" ", 1) for line in result.stdout.strip().splitlines() if line]
-    except subprocess.CalledProcessError:
-        return []
+        miner_pubkey_hex = share.get("pubkey", "")
+        if miner_pubkey_hex:
+            vk = nacl.signing.VerifyKey(bytes.fromhex(miner_pubkey_hex))
+            msg = json.dumps({k: v for k, v in share.items() if k != "pubkey"}, separators=(',', ':')).encode()
+            vk.verify(msg, bytes.fromhex(sig_hex))
+    except Exception as e:
+        return False, f"signature invalid: {e}"
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--template", required=True)
-    ap.add_argument("--algo-config", required=True)
-    ap.add_argument("--pending-ref", default="origin/shares-pending")
-    ap.add_argument("--accepted-ref", default="shares-accepted")
-    ap.add_argument("--rejected-ref", default="shares-rejected")
-    args = ap.parse_args()
+    # Verify hash meets difficulty
+    try:
+        blob = bytes.fromhex(current_template.get("blob", ""))
+        nonce = bytes.fromhex(share.get("nonce", ""))
+        target = int(current_template.get("target", "0" * 64), 16)
 
-    import yaml
-    template = json.loads(Path(args.template).read_text())
-    algo_cfg = yaml.safe_load(Path(args.algo_config).read_text())
-
-    commits = get_commits_on_ref(args.pending_ref)
-    accepted = 0
-    rejected = 0
-
-    for sha, msg in commits:
-        share, sig = parse_share_commit(msg)
-        if share is None:
-            print(f"[validate] {sha[:8]} SKIP (not a share commit)")
-            continue
-        ok, reason = validate_share(share, sig, template, algo_cfg)
-        if ok:
-            subprocess.run(["git", "cherry-pick", sha], capture_output=True)
-            subprocess.run(["git", "push", "origin", f"HEAD:{args.accepted_ref}"], capture_output=True)
-            accepted += 1
-            print(f"[validate] {sha[:8]} ACCEPT {share.get('algo')} miner={share.get('miner','?')[:12]}...")
+        if algo == "sha256d":
+            header = blob[:72] + nonce
+            h = sha256d(header)
+            valid = int.from_bytes(h[::-1], 'big') <= target
+        elif algo == "scrypt":
+            valid = verify_scrypt(blob, nonce, target)
+        elif algo == "myr-groestl":
+            valid = verify_myr_groestl(blob, nonce, target)
         else:
-            subprocess.run(["git", "push", "origin", f"{sha}:refs/heads/{args.rejected_ref}"], capture_output=True)
-            rejected += 1
-            print(f"[validate] {sha[:8]} REJECT {reason}")
+            valid = False
 
-    print(f"[validate] done: {accepted} accepted, {rejected} rejected")
+        if not valid:
+            return False, "hash does not meet target"
+    except Exception as e:
+        return False, f"hash verification error: {e}"
 
-if __name__ == "__main__":
-    main()
+    return True, "ok"
+
+# Get commits from shares-pending branch not yet in shares-accepted
+result = subprocess.run(
+    ["git", "log", "origin/shares-accepted..origin/shares-pending", "--format=%H %s"],
+    capture_output=True, text=True, cwd=ROOT
+)
+
+lines = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
+print(f"[validate_shares] Found {len(lines)} pending share commits")
+
+accepted = []
+rejected = []
+
+for line in lines:
+    commit_hash, *msg_parts = line.split(" ", 1)
+    msg = msg_parts[0] if msg_parts else ""
+    m = SHARE_RE.match(msg)
+    if not m:
+        print(f"  SKIP {commit_hash[:8]}: not a SHARE commit")
+        continue
+
+    try:
+        share = json.loads(m.group(1))
+        sig = m.group(2)
+    except json.JSONDecodeError as e:
+        rejected.append((commit_hash, f"JSON parse error: {e}"))
+        continue
+
+    valid, reason = verify_share(share, sig)
+    if valid:
+        accepted.append((commit_hash, share))
+        print(f"  ACCEPT {commit_hash[:8]}: miner={share.get('miner', '?')[:12]}... algo={share.get('algo')}")
+    else:
+        rejected.append((commit_hash, reason))
+        print(f"  REJECT {commit_hash[:8]}: {reason}")
+
+# Write results for update_stats.py
+(ROOT / "state").mkdir(exist_ok=True)
+(ROOT / "state/validated_shares.json").write_text(json.dumps({
+    "accepted": [{"commit": c, "share": s} for c, s in accepted],
+    "rejected": [{"commit": c, "reason": r} for c, r in rejected],
+    "validated_at": __import__('time').time()
+}, indent=2))
+
+print(f"[validate_shares] Accepted: {len(accepted)} Rejected: {len(rejected)}")

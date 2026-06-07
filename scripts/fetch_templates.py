@@ -1,54 +1,41 @@
 #!/usr/bin/env python3
-"""Fetch block templates from trinityd for all enabled algorithms."""
-import argparse, json, os, sys, time
+"""
+Fetch block templates from Trinity daemon for all enabled algorithms.
+Outputs: config/templates/{algo}.json
+"""
+import json
+import os
+import sys
+import time
 from pathlib import Path
-import requests
 
-ALGO_CAPS = {
-    "sha256d":     {"capabilities": ["coinbasetxn", "workid"], "version": 1},
-    "scrypt":      {"capabilities": ["coinbasetxn", "workid"], "version": 1},
-    "myr-groestl": {"capabilities": ["coinbasetxn", "workid"], "version": 1},
-}
+import yaml
+from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
 
-def rpc(url, user, pwd, method, params=None):
-    r = requests.post(url, json={"jsonrpc":"1.0","id":"gitmine","method":method,"params":params or []},
-                      auth=(user, pwd), timeout=10)
-    r.raise_for_status()
-    data = r.json()
-    if data.get("error"):
-        raise RuntimeError(f"RPC error: {data['error']}")
-    return data["result"]
+ROOT = Path(__file__).parent.parent
+config = yaml.safe_load((ROOT / "config/pool.yaml").read_text())
+algos_cfg = yaml.safe_load((ROOT / "config/algorithms.yaml").read_text())
 
-def fetch_template(rpc_url, user, pwd, algo):
-    payload = {"rules": ["segwit"], **ALGO_CAPS[algo]}
-    result = rpc(rpc_url, user, pwd, "getblocktemplate", [payload])
-    result["algo"] = algo
-    result["fetched_at"] = int(time.time())
-    result["expires_at"] = int(time.time()) + 30
-    return result
+rpc_url = (
+    f"http://{os.environ['TRINITY_RPC_USER']}:{os.environ['TRINITY_RPC_PASS']}"
+    f"@{config['pool']['rpc']['host']}:{config['pool']['rpc']['port']}"
+)
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--rpc-host", default="127.0.0.1")
-    ap.add_argument("--rpc-port", default=12345, type=int)
-    ap.add_argument("--rpc-user", default=os.environ.get("TTY_RPC_USER", "user"))
-    ap.add_argument("--rpc-pass", default=os.environ.get("TTY_RPC_PASS", "pass"))
-    ap.add_argument("--algos", default="sha256d,scrypt,myr-groestl")
-    ap.add_argument("--output-dir", required=True)
-    args = ap.parse_args()
+output_dir = ROOT / "config/templates"
+output_dir.mkdir(parents=True, exist_ok=True)
 
-    rpc_url = f"http://{args.rpc_host}:{args.rpc_port}/"
-    out = Path(args.output_dir)
-    out.mkdir(parents=True, exist_ok=True)
+rpc = AuthServiceProxy(rpc_url, timeout=30)
 
-    algos = [a.strip() for a in args.algos.split(",")]
-    for algo in algos:
-        try:
-            tpl = fetch_template(rpc_url, args.rpc_user, args.rpc_pass, algo)
-            (out / f"{algo}.json").write_text(json.dumps(tpl, indent=2))
-            print(f"[fetch_templates] {algo} height={tpl.get('height','?')} ok")
-        except Exception as e:
-            print(f"[fetch_templates] {algo} ERROR: {e}", file=sys.stderr)
-
-if __name__ == "__main__":
-    main()
+for algo, algo_cfg in algos_cfg["algorithms"].items():
+    if not algo_cfg.get("enabled", True):
+        continue
+    try:
+        template = rpc.getblocktemplate({"capabilities": ["coinbasetxn", "workid", "coinbase/append"], "rules": []})
+        template["algo"] = algo
+        template["fetched_at"] = int(time.time())
+        template["expires_at"] = int(time.time()) + config["template"]["ttl"]
+        template["difficulty"] = algo_cfg["difficulty"]
+        (output_dir / f"{algo}.json").write_text(json.dumps(template, indent=2))
+        print(f"[fetch_templates] {algo}: height={template['height']} ok")
+    except Exception as e:
+        print(f"[fetch_templates] {algo}: ERROR {e}", file=sys.stderr)

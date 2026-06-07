@@ -1,68 +1,56 @@
 #!/usr/bin/env python3
-"""Compute pending payouts using PPLNS and write to payouts/pending/."""
-import argparse, json, time
+"""
+Process pending payouts based on PPLNS share accounting.
+Outputs: payouts/pending/{timestamp}.json
+Payouts are broadcast via Trinity public RPC nodes (no local wallet needed).
+"""
+import json
+import os
+import time
 from pathlib import Path
-from collections import defaultdict
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--stats", required=True)
-    ap.add_argument("--payout-config", required=True)
-    ap.add_argument("--pool-address", required=True)
-    ap.add_argument("--rpc-host", default="127.0.0.1")
-    ap.add_argument("--rpc-port", default=12345, type=int)
-    ap.add_argument("--rpc-user", default="user")
-    ap.add_argument("--rpc-pass", default="pass")
-    ap.add_argument("--pending-dir", required=True)
-    args = ap.parse_args()
+import yaml
+import requests
 
-    import yaml
-    payout_cfg = yaml.safe_load(Path(args.payout_config).read_text())["payouts"]
-    stats = json.loads(Path(args.stats).read_text())
-    threshold = float(payout_cfg.get("threshold", 100))
-    fee = float(payout_cfg.get("tx_fee", 0.001))
-    min_payout = float(payout_cfg.get("min_payout", 10))
+ROOT = Path(__file__).parent.parent
+config = yaml.safe_load((ROOT / "config/pool.yaml").read_text())
+payout_cfg = yaml.safe_load((ROOT / "config/payouts.yaml").read_text())["payouts"]
 
-    miners = stats.get("miners", [])
-    pending = []
+stats = json.loads((ROOT / "docs/stats.json").read_text()) if (ROOT / "docs/stats.json").exists() else {}
+miners = stats.get("miners", {})
+force = os.environ.get("FORCE_PAYOUT", "false").lower() == "true"
 
-    # Load existing pending payouts to avoid double-paying
-    pending_dir = Path(args.pending_dir)
-    pending_dir.mkdir(parents=True, exist_ok=True)
-    paid_addresses = set()
-    for f in pending_dir.glob("*.json"):
-        try:
-            existing = json.loads(f.read_text())
-            for p in existing.get("payouts", []):
-                paid_addresses.add(p["address"])
-        except Exception:
-            pass
+total_shares = max(stats.get("total_shares", 1), 1)
+threshold = payout_cfg.get("threshold", 100)
 
-    for miner in miners:
-        addr = miner["address"]
-        if addr in paid_addresses or addr == args.pool_address:
-            continue
-        # Simplified: use share count as proxy for earnings
-        # In production: use PPLNS window over block rewards
-        shares_24h = miner.get("shares_24h", 0)
-        if shares_24h == 0:
-            continue
-        # Placeholder earning calc (replace with actual block reward allocation)
-        estimated_earnings = shares_24h * 0.01  # dummy: 0.01 TTY per share
-        if estimated_earnings >= min_payout:
-            pending.append({
-                "address": addr,
-                "amount": round(estimated_earnings - fee, 6),
-                "shares_24h": shares_24h,
-                "computed_at": int(time.time())
-            })
+# Simulated pool balance (replace with actual RPC call in production)
+# pool_balance = rpc.getbalance()
+pool_balance = 0.0  # Placeholder
 
-    if pending:
-        payout_file = pending_dir / f"{time.strftime('%Y-%m-%d-%H%M%S')}.json"
-        payout_file.write_text(json.dumps({"payouts": pending, "created_at": int(time.time())}, indent=2))
-        print(f"[process_payouts] {len(pending)} payout(s) queued: {payout_file.name}")
-    else:
-        print("[process_payouts] no payouts due")
+pending_payouts = []
+for addr, miner in miners.items():
+    share_fraction = miner["shares"] / total_shares
+    owed = pool_balance * share_fraction * (1 - config["pool"]["fee_percent"] / 100)
+    if owed >= threshold or force:
+        pending_payouts.append({"address": addr, "amount": round(owed, 8), "shares": miner["shares"]})
 
-if __name__ == "__main__":
-    main()
+if not pending_payouts:
+    print(f"[process_payouts] No payouts due (threshold={threshold} TTY, force={force})")
+    exit(0)
+
+payout_record = {
+    "id": int(time.time()),
+    "created_at": time.time(),
+    "status": "pending",
+    "payouts": pending_payouts,
+    "total_out": sum(p["amount"] for p in pending_payouts),
+    "requires_signatures": payout_cfg["signing"]["required"],
+    "signatures": []
+}
+
+(ROOT / "payouts/pending").mkdir(parents=True, exist_ok=True)
+payout_path = ROOT / f"payouts/pending/{payout_record['id']}.json"
+payout_path.write_text(json.dumps(payout_record, indent=2))
+
+print(f"[process_payouts] Created payout record: {payout_path.name}")
+print(f"  Recipients: {len(pending_payouts)} Total: {payout_record['total_out']:.8f} TTY")

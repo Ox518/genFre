@@ -1,53 +1,55 @@
 #!/usr/bin/env python3
-"""Select the next active template via round-robin or profitability."""
-import argparse, json, os
+"""
+Select the active template from available per-algo templates.
+Rotation strategy: round-robin (default) or profitability.
+Outputs: docs/template.json (served by GitHub Pages)
+"""
+import json
+import os
+import time
 from pathlib import Path
+
 import yaml
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--templates-dir", required=True)
-    ap.add_argument("--algo-config", required=True)
-    ap.add_argument("--stats-file", default="state/stats.json")
-    ap.add_argument("--output", required=True)
-    args = ap.parse_args()
+ROOT = Path(__file__).parent.parent
+config = yaml.safe_load((ROOT / "config/pool.yaml").read_text())
+algos_cfg = yaml.safe_load((ROOT / "config/algorithms.yaml").read_text())
 
-    algo_cfg = yaml.safe_load(Path(args.algo_config).read_text())
-    mode = algo_cfg.get("selection_mode", "round_robin")
-    enabled = [a for a, v in algo_cfg["algorithms"].items() if v.get("enabled", True)]
+templates_dir = ROOT / "config/templates"
+state_file = ROOT / "state/rotation_state.json"
+state_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Load existing template to determine last algo
-    last_algo = None
-    out_path = Path(args.output)
-    if out_path.exists():
-        try:
-            last_algo = json.loads(out_path.read_text()).get("algo")
-        except Exception:
-            pass
+# Load rotation state
+if state_file.exists():
+    rotation = json.loads(state_file.read_text())
+else:
+    rotation = {"last_algo": None, "algo_order": list(algos_cfg["algorithms"].keys()), "index": 0}
 
-    if mode == "fixed":
-        chosen = algo_cfg.get("fixed_algo", enabled[0])
-    elif mode == "round_robin":
-        if last_algo in enabled:
-            idx = (enabled.index(last_algo) + 1) % len(enabled)
-        else:
-            idx = 0
-        chosen = enabled[idx]
-    else:
-        chosen = enabled[0]  # fallback
+enabled_algos = [
+    a for a, c in algos_cfg["algorithms"].items()
+    if c.get("enabled") and (templates_dir / f"{a}.json").exists()
+]
 
-    tpl_file = Path(args.templates_dir) / f"{chosen}.json"
-    if not tpl_file.exists():
-        # Fall back to any available template
-        available = list(Path(args.templates_dir).glob("*.json"))
-        if not available:
-            raise FileNotFoundError("No templates available")
-        tpl_file = available[0]
+if not enabled_algos:
+    print("[select_template] No templates available. Exiting.")
+    exit(1)
 
-    tpl = json.loads(tpl_file.read_text())
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(tpl, indent=2))
-    print(f"[select_template] chose {tpl.get('algo')} height={tpl.get('height','?')}")
+# Round-robin selection
+next_index = (rotation.get("index", 0)) % len(enabled_algos)
+selected_algo = enabled_algos[next_index]
+rotation["index"] = (next_index + 1) % len(enabled_algos)
+rotation["last_algo"] = selected_algo
 
-if __name__ == "__main__":
-    main()
+# Load and finalize template
+template = json.loads((templates_dir / f"{selected_algo}.json").read_text())
+template["selected_at"] = int(time.time())
+template["expires_at"] = int(time.time()) + int(yaml.safe_load((ROOT / "config/pool.yaml").read_text())["template"]["ttl"])
+
+# Write to docs/ (GitHub Pages)
+(ROOT / "docs").mkdir(exist_ok=True)
+(ROOT / "docs/template.json").write_text(json.dumps(template, indent=2))
+
+# Persist rotation state
+state_file.write_text(json.dumps(rotation, indent=2))
+
+print(f"[select_template] Active: {selected_algo} height={template.get('height')}")
