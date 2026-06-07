@@ -1,22 +1,16 @@
-# GitMine TTY — Payout Configuration
+# GitMine — Payout Configuration
 payouts:
-  threshold: 100.0         # Minimum TTY to trigger payout
-  fee_reserve: 0.1         # TTY kept per tx for network fee
-  schedule: "on-threshold" # on-threshold | hourly | daily | manual
-  method: "pplns"          # pplns | prop | solo
-  pplns_window: 2016       # shares in PPLNS window
+  # Minimum balance (in coin units) before a payout is generated
+  threshold: 1.0
 
-  # Multisig signing requirements
+  # PPLNS window: number of recent shares used for reward calculation
+  pplns_window: 200
+
+  # Signing: how many operator signatures are required before broadcast
   signing:
-    required: 1             # of-N (set to 2 for multisig)
-    total: 1
-    # Add WebAuthn public key fingerprints of signers here
-    signers: []
+    required: 1
+    method: "webauthn"   # webauthn | gpg | manual
 
-  rpc_broadcast:
-    # Trinity public RPC nodes — sourced from 5mil/Trinity network
-    endpoints:
-      - "http://explorer.trinitycoin.org:12345"
-      - "http://node.trinitycoin.org:12345"
-    fallback_enabled: true
-    timeout_seconds: 30
+  # Schedule: payouts are triggered by the pool workflow
+  # Set force_payout=true in workflow_dispatch to override threshold
+  schedule: "on_threshold"
