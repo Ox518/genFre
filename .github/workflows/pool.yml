@@ -1,0 +1,157 @@
+name: GitMine TTY Pool Operator
+
+on:
+  schedule:
+    - cron: '*/2 * * * *'      # Every 2 minutes: refresh templates, validate shares
+  push:
+    branches:
+      - shares-pending           # Triggered when miners push shares
+      - 'fleet/**'               # Triggered when fleet config changes
+  workflow_dispatch: {}          # Manual trigger
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  operate:
+    name: Pool Operator
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repo (full history for branch ops)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Build Trinity Daemon (cached)
+        id: trinityd
+        uses: actions/cache@v4
+        with:
+          path: bin/trinityd
+          key: trinityd-${{ hashFiles('scripts/build-trinityd.sh') }}
+      - name: Build trinityd if not cached
+        if: steps.trinityd.outputs.cache-hit != 'true'
+        run: bash scripts/build-trinityd.sh
+
+      - name: Start Trinity Daemon (pruned, 100 blocks)
+        run: |
+          mkdir -p ~/.trinity
+          cat > ~/.trinity/trinity.conf << EOF
+          rpcuser=${{ secrets.TTY_RPC_USER }}
+          rpcpassword=${{ secrets.TTY_RPC_PASS }}
+          rpcbind=127.0.0.1
+          rpcport=12345
+          prune=550
+          daemon=1
+          EOF
+          ./bin/trinityd -datadir=$HOME/.trinity -conf=$HOME/.trinity/trinity.conf
+          echo "Waiting for daemon sync..."
+          sleep 20
+
+      - name: Fetch Block Templates (all algos)
+        run: |
+          python scripts/fetch_templates.py \
+            --rpc-host 127.0.0.1 \
+            --rpc-port 12345 \
+            --rpc-user ${{ secrets.TTY_RPC_USER }} \
+            --rpc-pass ${{ secrets.TTY_RPC_PASS }} \
+            --algos sha256d,scrypt,myr-groestl \
+            --output-dir state/templates/
+
+      - name: Select Active Template (round-robin / profitability)
+        run: |
+          python scripts/select_template.py \
+            --templates-dir state/templates/ \
+            --algo-config config/algorithms.yaml \
+            --stats-file state/stats.json \
+            --output docs/template.json
+
+      - name: Validate Pending Shares
+        run: |
+          git fetch origin shares-pending || true
+          git fetch origin shares-accepted || true
+          git fetch origin shares-rejected || true
+          python scripts/validate_shares.py \
+            --template docs/template.json \
+            --algo-config config/algorithms.yaml \
+            --pending-ref origin/shares-pending \
+            --accepted-ref shares-accepted \
+            --rejected-ref shares-rejected
+
+      - name: Update Pool Statistics
+        run: |
+          python scripts/update_stats.py \
+            --accepted-ref shares-accepted \
+            --pool-config config/pool.yaml \
+            --algo-config config/algorithms.yaml \
+            --output-stats docs/stats.json \
+            --output-state state/stats.json
+
+      - name: Process Payouts
+        run: |
+          python scripts/process_payouts.py \
+            --stats state/stats.json \
+            --payout-config config/payouts.yaml \
+            --pool-address ${{ secrets.POOL_ADDRESS }} \
+            --rpc-host 127.0.0.1 \
+            --rpc-port 12345 \
+            --rpc-user ${{ secrets.TTY_RPC_USER }} \
+            --rpc-pass ${{ secrets.TTY_RPC_PASS }} \
+            --pending-dir payouts/pending/
+
+      - name: Monitor Fleet Heartbeats
+        run: |
+          python scripts/monitor_fleet.py \
+            --fleet-dir fleet/ \
+            --stats-output state/fleet_status.json \
+            --stale-threshold 90
+
+      - name: Commit Updated State
+        run: |
+          git config user.name "gitmine-bot"
+          git config user.email "gitmine-bot@users.noreply.github.com"
+          git add docs/ state/ payouts/pending/ || true
+          git diff --staged --quiet || git commit -m "chore: pool update $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push origin main
+
+      - name: Tag Template (signed, immutable)
+        run: |
+          HEIGHT=$(python -c "import json; print(json.load(open('docs/template.json'))['height'])")
+          ALGO=$(python -c "import json; print(json.load(open('docs/template.json'))['algo'])")
+          TAG="template-${ALGO}-${HEIGHT}"
+          git tag "$TAG" -m "Block template: $ALGO @ height $HEIGHT" 2>/dev/null || true
+          git push origin "$TAG" 2>/dev/null || true
+
+      - name: Deploy Dashboard to GitHub Pages
+        uses: actions/deploy-pages@v4
+        with:
+          path: docs
+        continue-on-error: true
+
+      - name: Broadcast State Update (Cloudflare Worker)
+        if: env.WORKER_SECRET != ''
+        env:
+          WORKER_SECRET: ${{ secrets.WORKER_SECRET }}
+        run: |
+          HEIGHT=$(python -c "import json; print(json.load(open('docs/template.json'))['height'])" 2>/dev/null || echo 0)
+          ALGO=$(python -c "import json; print(json.load(open('docs/template.json'))['algo'])" 2>/dev/null || echo unknown)
+          curl -s -X POST https://gitmine-tty.workers.dev/broadcast \
+            -H "Authorization: Bearer $WORKER_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"type\":\"state_update\",\"algo\":\"$ALGO\",\"height\":$HEIGHT}" || true
