@@ -1,26 +1,45 @@
-# GitMine TTY — Pool Configuration
+# GitMine — Dual-Coin Pool Configuration
+# Coins: Fennec (FNNC) + Trinity (TTY)
+
 pool:
-  name: "GitMine TTY"
-  ticker: "TTY"
-  address: "${POOL_ADDRESS}"   # Set via GitHub Secret POOL_ADDRESS
-  fee_percent: 1.0
-  network: "mainnet"  # mainnet | testnet
-  rpc:
-    host: "127.0.0.1"
-    port: 12345
-    user: "ttypool"
-    password: "${TRINITY_RPC_PASS}"   # Set via GitHub Secret TRINITY_RPC_PASS
+  name: "GitMine"
+  operator_github_owner: "5mil"
+  operator_github_repo: "gitmine-tty"
+  pages_base: "https://5mil.github.io/gitmine-tty"
+
+coins:
+  fnnc:
+    ticker: "FNNC"
+    name: "Fennec"
+    address: "${FNNC_POOL_ADDRESS}"   # GitHub Secret: FNNC_POOL_ADDRESS
+    fee_percent: 1.0
+    network: "mainnet"
+    rpc:
+      host: "127.0.0.1"
+      port: 8339
+      user: "fnncpool"
+      password: "${FNNC_RPC_PASS}"    # GitHub Secret: FNNC_RPC_PASS
+    algo: "yescryptr16"
+
+  tty:
+    ticker: "TTY"
+    name: "Trinity"
+    address: "${TTY_POOL_ADDRESS}"    # GitHub Secret: TTY_POOL_ADDRESS
+    fee_percent: 1.0
+    network: "mainnet"
+    rpc:
+      host: "127.0.0.1"
+      port: 12345
+      user: "ttypool"
+      password: "${TTY_RPC_PASS}"     # GitHub Secret: TTY_RPC_PASS
+    algo: "sha256d"
 
 operator:
-  github_owner: "5mil"
-  github_repo: "gitmine-tty"
-  pages_base: "https://5mil.github.io/gitmine-tty"
   relay_host: "0.0.0.0"
   relay_port: 8765
 
 template:
   ttl: 30              # seconds before template expires
-  rotation: "round-robin"  # round-robin | profitability | manual
   refresh_cron: "*/2 * * * *"
 
 shares:

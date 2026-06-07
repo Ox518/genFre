@@ -1,40 +1,27 @@
-# GitMine TTY — Algorithm Configuration (Trinity multi-algo)
+# GitMine — Algorithm Configuration
+# Coins: Fennec (FNNC) and Trinity (TTY)
 algorithms:
-  sha256d:
-    enabled: true
-    display_name: "SHA256d"
-    target_hardware: "ASIC"
-    difficulty: 500000
-    difficulty_adjust_blocks: 10
-    nonce_offset: 72        # byte offset in 80-byte header
-    nonce_length: 8
-    hash_byte_order: "little-endian"
-    color: "#f7931a"
 
-  scrypt:
+  yescryptr16:
+    coin: "FNNC"
     enabled: true
-    display_name: "Scrypt"
-    target_hardware: "GPU/ASIC"
-    difficulty: 12000
-    difficulty_adjust_blocks: 10
-    params:
-      N: 1024
-      r: 1
-      p: 1
-      dklen: 32
-    nonce_offset: 72
-    nonce_length: 8
-    hash_byte_order: "little-endian"
-    color: "#2c9fdd"
-
-  myr-groestl:
-    enabled: true
-    display_name: "Myr-Groestl"
-    target_hardware: "GPU/CPU"
+    display_name: "YescryptR16"
+    target_hardware: "CPU/GPU"
     difficulty: 8000
     difficulty_adjust_blocks: 10
-    groestl_bits: 512       # Groestl-512 truncated to 32 bytes
-    nonce_offset: 72
-    nonce_length: 8
+    nonce_offset: 76
+    nonce_length: 4
     hash_byte_order: "little-endian"
-    color: "#8b5cf6"
+    color: "#f97316"
+
+  sha256d:
+    coin: "TTY"
+    enabled: true
+    display_name: "SHA256d"
+    target_hardware: "ASIC/GPU"
+    difficulty: 500000
+    difficulty_adjust_blocks: 10
+    nonce_offset: 76
+    nonce_length: 4
+    hash_byte_order: "little-endian"
+    color: "#3b82f6"
