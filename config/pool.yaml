@@ -1,0 +1,23 @@
+# GitMine TTY — Pool Configuration
+# Edit this file and push to apply changes. GitHub Actions picks up on next run.
+
+pool:
+  name: "GitMine TTY"
+  address: "TYourTrinityAddressHere"   # REQUIRED: your Trinity payout address
+  fee_percent: 1.0                      # Pool fee (1.0 = 1%)
+  payout_threshold: 100                 # Minimum TTY to trigger payout
+  payout_interval: "daily"              # daily | weekly | block | threshold
+  min_payout: 10                        # Minimum individual miner payout
+
+# Stratum (served by Actions — no TCP, miners use git protocol)
+stratum:
+  share_ttl: 30                         # Seconds before template expires
+  max_shares_per_commit: 10             # Batch shares per git push
+  difficulty_retarget_shares: 100       # Retarget every N shares per miner
+
+# Operator
+operator:
+  rpc_host: "127.0.0.1"               # trinityd RPC (only accessible in Actions)
+  rpc_port: 12345
+  rpc_user: "${TTY_RPC_USER}"          # GitHub Secret
+  rpc_pass: "${TTY_RPC_PASS}"          # GitHub Secret

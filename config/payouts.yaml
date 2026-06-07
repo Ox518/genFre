@@ -1,0 +1,9 @@
+# GitMine TTY — Payout Configuration
+
+payouts:
+  method: "PPLNS"            # PPLNS | PPS | PROP
+  pplns_window: 100          # Last N shares for PPLNS
+  tx_fee: 0.001              # TTY fee per payout tx
+  consolidate_outputs: true  # Batch multiple miners into one tx
+  rpc_broadcast_url: "https://explorer.trinity-coin.org/api/sendtx"  # Public RPC fallback
+  require_signatures: 1      # WebAuthn signatures required to release payout
