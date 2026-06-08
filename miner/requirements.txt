@@ -1,4 +1,4 @@
 requests>=2.31.0
 pynacl>=1.5.0
 yescrypt>=0.1.0
-pyyaml>=6.0.1
+cryptography>=41.0.0

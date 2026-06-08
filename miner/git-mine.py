@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
 GitMine — Miner Client
-Polls the pool template from GitHub Pages, hashes with the correct algo,
-and submits shares as signed git commits to shares-pending.
 
-Usage:
-  python miner/git-mine.py --coin FNNC --address FYourFennecAddress --rig rig-001
-  python miner/git-mine.py --coin TTY  --address TYourTrinityAddress --rig rig-001
+Two ways to start:
 
-First run: generates an Ed25519 keypair in fleet/<rig-id>/keys/ and prints the pubkey.
+  1. With a downloaded config file (easiest):
+     python miner/git-mine.py --config ~/gitmine.json
+
+  2. With flags (manual setup):
+     python miner/git-mine.py --coin FNNC --address FYourAddress --rig rig-001
+     (generates a keypair on first run, prints the pubkey to register on the dashboard)
 """
 import argparse
 import hashlib
@@ -21,108 +22,116 @@ import time
 from pathlib import Path
 
 import requests
-import nacl.signing
-import nacl.encoding
 
 ROOT = Path(__file__).parent.parent
 
-ALGO_MAP = {
-    "FNNC": "yescryptr16",
-    "TTY":  "sha256d",
-}
+ALGO_MAP = {'FNNC': 'yescryptr16', 'TTY': 'sha256d'}
 
-# ─────────────────────────── Key management
 
-def load_or_create_keypair(rig_id: str) -> nacl.signing.SigningKey:
-    key_dir = ROOT / f"fleet/{rig_id}/keys"
+# ─────────────────── Config loading
+
+def load_config(path: str) -> dict:
+    with open(path) as f:
+        return json.load(f)
+
+
+def load_or_create_key(rig_id: str) -> tuple[bytes, str]:
+    """Load or generate an Ed25519 key. Returns (private_key_bytes, public_key_hex)."""
+    import nacl.signing, nacl.encoding
+    key_dir = ROOT / f'fleet/{rig_id}/keys'
     key_dir.mkdir(parents=True, exist_ok=True)
-    key_file = key_dir / "signing.key"
+    key_file = key_dir / 'signing.key'
     if key_file.exists():
         sk = nacl.signing.SigningKey(bytes.fromhex(key_file.read_text().strip()))
     else:
         sk = nacl.signing.SigningKey.generate()
         key_file.write_text(sk.encode(encoder=nacl.encoding.HexEncoder).decode())
         key_file.chmod(0o600)
-        print(f"[gitmine] Generated new keypair for {rig_id}")
-        print(f"[gitmine] Public key: {sk.verify_key.encode(encoder=nacl.encoding.HexEncoder).decode()}")
-        print(f"[gitmine] Add this rig to the pool by committing fleet/{rig_id}/config.yaml")
-    return sk
+        pubkey = sk.verify_key.encode(encoder=nacl.encoding.HexEncoder).decode()
+        print(f'[gitmine] Generated new keypair for {rig_id}')
+        print(f'[gitmine] Public key: {pubkey}')
+        print(f'[gitmine] Register this rig on the pool dashboard: {ROOT}/docs/index.html')
+        print(f'[gitmine] Or visit: https://5mil.github.io/gitmine-tty')
+    pubkey = sk.verify_key.encode(encoder=nacl.encoding.HexEncoder).decode()
+    return sk, pubkey
 
 
-# ─────────────────────────── Template fetching
-
-def fetch_template(pages_base: str) -> dict | None:
-    url = f"{pages_base.rstrip('/')}/template.json"
-    try:
-        r = requests.get(url, timeout=10)
-        r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        print(f"[gitmine] Template fetch failed: {e}", file=sys.stderr)
-        return None
+def key_from_pkcs8_hex(hex_str: str):
+    """Load Ed25519 signing key from PKCS8 hex (as exported by WebCrypto)."""
+    import nacl.signing
+    from cryptography.hazmat.primitives.serialization import load_der_private_key
+    der = bytes.fromhex(hex_str)
+    priv = load_der_private_key(der, password=None)
+    raw = priv.private_bytes_raw()
+    return nacl.signing.SigningKey(raw)
 
 
-# ─────────────────────────── Hashing
+# ─────────────────── Hashing
 
 def sha256d(data: bytes) -> bytes:
     return hashlib.sha256(hashlib.sha256(data).digest()).digest()
 
 
 def hash_sha256d(blob: bytes, nonce: int) -> bytes:
-    header = blob[:76] + struct.pack('<I', nonce)
-    return sha256d(header)
+    return sha256d(blob[:76] + struct.pack('<I', nonce & 0xFFFFFFFF))
 
 
 def hash_yescryptr16(blob: bytes, nonce: int) -> bytes:
     try:
         import yescrypt
-        header = blob[:76] + struct.pack('<I', nonce)
+        header = blob[:76] + struct.pack('<I', nonce & 0xFFFFFFFF)
         return yescrypt.hash(header, header, N=2048, r=8, p=1)
     except ImportError:
-        raise RuntimeError("yescrypt package not installed. Run: pip install yescrypt")
+        raise RuntimeError('Install yescrypt: pip install yescrypt')
 
 
-HASH_FN = {
-    "sha256d":      hash_sha256d,
-    "yescryptr16":  hash_yescryptr16,
-}
+HASH_FN = {'sha256d': hash_sha256d, 'yescryptr16': hash_yescryptr16}
 
 
-# ─────────────────────────── Share signing + submission
+# ─────────────────── Template
 
-def sign_share(share: dict, sk: nacl.signing.SigningKey) -> str:
-    payload = json.dumps({k: v for k, v in share.items() if k != "pubkey"}, separators=(',', ':'))
+def fetch_template(pool_url: str) -> dict | None:
+    url = pool_url.rstrip('/') + '/template.json'
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f'[gitmine] Template fetch failed: {e}', file=sys.stderr)
+        return None
+
+
+# ─────────────────── Share submission
+
+def sign_share(share: dict, sk) -> str:
+    import nacl.encoding
+    payload = json.dumps({k: v for k, v in share.items() if k != 'pubkey'}, separators=(',', ':'))
     sig = sk.sign(payload.encode()).signature
     return sig.hex()
 
 
-def submit_share(share: dict, sig: str) -> bool:
+def submit_share(share: dict, sig: str, repo_path: Path) -> bool:
     msg = f'SHARE{json.dumps(share, separators=(",",":"))}|SIG{sig}'
     try:
         env = os.environ.copy()
-        subprocess.run(["git", "checkout", "--orphan", "tmp-share"], cwd=ROOT, capture_output=True)
-        subprocess.run(["git", "commit", "--allow-empty", "-m", msg], cwd=ROOT, env=env, check=True, capture_output=True)
-        subprocess.run(["git", "push", "origin", "HEAD:shares-pending"], cwd=ROOT, env=env, check=True, capture_output=True)
-        subprocess.run(["git", "checkout", "main"], cwd=ROOT, capture_output=True)
-        subprocess.run(["git", "branch", "-D", "tmp-share"], cwd=ROOT, capture_output=True)
+        subprocess.run(['git', 'commit', '--allow-empty', '-m', msg],
+                       cwd=repo_path, env=env, check=True, capture_output=True)
+        subprocess.run(['git', 'push', 'origin', 'HEAD:shares-pending'],
+                       cwd=repo_path, env=env, check=True, capture_output=True)
         return True
     except subprocess.CalledProcessError as e:
-        print(f"[gitmine] Share push failed: {e.stderr.decode()}", file=sys.stderr)
-        subprocess.run(["git", "checkout", "main"], cwd=ROOT, capture_output=True)
+        print(f'[gitmine] Push failed: {e.stderr.decode()}', file=sys.stderr)
         return False
 
 
-# ─────────────────────────── Mining loop
+# ─────────────────── Mining loop
 
-def mine(coin: str, address: str, rig_id: str, pages_base: str, threads: int = 1):
+def mine(coin: str, address: str, rig_id: str, pool_url: str, sk, pubkey_hex: str, threads: int = 1):
     algo = ALGO_MAP[coin.upper()]
-    sk = load_or_create_keypair(rig_id)
-    pubkey_hex = sk.verify_key.encode(encoder=nacl.encoding.HexEncoder).decode()
     hash_fn = HASH_FN[algo]
-
-    print(f"[gitmine] Starting miner: coin={coin} algo={algo} rig={rig_id}")
-    print(f"[gitmine] Address: {address}")
-    print(f"[gitmine] Pubkey:  {pubkey_hex}")
+    print(f'[gitmine] coin={coin} algo={algo} rig={rig_id} threads={threads}')
+    print(f'[gitmine] address={address}')
+    print(f'[gitmine] pubkey= {pubkey_hex}')
 
     template = None
     template_fetched_at = 0
@@ -133,73 +142,87 @@ def mine(coin: str, address: str, rig_id: str, pages_base: str, threads: int = 1
     while True:
         now = time.time()
 
-        # Refresh template every 30s or when expired
         if template is None or (now - template_fetched_at) > 25:
-            new_template = fetch_template(pages_base)
-            if new_template:
-                if template is None or new_template.get("height") != template.get("height") \
-                        or new_template.get("coin") != template.get("coin"):
-                    template = new_template
+            t = fetch_template(pool_url)
+            if t:
+                if template is None or t.get('height') != template.get('height') or t.get('coin') != template.get('coin'):
+                    template = t
                     nonce = 0
-                    print(f"[gitmine] New template: {template.get('coin')} height={template.get('height')} algo={template.get('algo')}")
+                    print(f'[gitmine] template: {t.get("coin")} height={t.get("height")} algo={t.get("algo")}')
                 template_fetched_at = now
             else:
                 time.sleep(5)
                 continue
 
-        # Only mine if this template matches our coin
-        if template.get("coin", "").upper() != coin.upper():
+        if template.get('coin', '').upper() != coin.upper():
             time.sleep(5)
             continue
 
-        blob = bytes.fromhex(template.get("blob", "0" * 152))
-        target = int(template.get("target", "0" * 64), 16)
+        blob   = bytes.fromhex(template.get('blob', '00' * 76))
+        target = int(template.get('target', 'f' * 64), 16)
 
-        # Hash batch
-        for _ in range(1000):
-            h = hash_fn(blob, nonce & 0xFFFFFFFF)
+        for _ in range(2000):
+            h   = hash_fn(blob, nonce & 0xFFFFFFFF)
             val = int.from_bytes(h[::-1], 'big')
             if val <= target:
-                difficulty = template.get("difficulty", 0)
                 share = {
-                    "coin": coin.upper(),
-                    "algo": algo,
-                    "nonce": struct.pack('<I', nonce & 0xFFFFFFFF).hex(),
-                    "hash": h.hex(),
-                    "height": template.get("height"),
-                    "difficulty": difficulty,
-                    "miner": address,
-                    "pubkey": pubkey_hex,
-                    "rig": rig_id,
-                    "ts": int(now),
+                    'coin':       coin.upper(),
+                    'algo':       algo,
+                    'nonce':      struct.pack('<I', nonce & 0xFFFFFFFF).hex(),
+                    'hash':       h.hex(),
+                    'height':     template.get('height'),
+                    'difficulty': template.get('difficulty', 0),
+                    'miner':      address,
+                    'pubkey':     pubkey_hex,
+                    'rig':        rig_id,
+                    'ts':         int(now),
                 }
                 sig = sign_share(share, sk)
-                ok = submit_share(share, sig)
+                ok  = submit_share(share, sig, ROOT)
                 if ok:
                     shares_found += 1
                     elapsed = time.time() - start
-                    hashrate = (nonce / elapsed) if elapsed > 0 else 0
-                    print(f"[gitmine] SHARE #{shares_found} submitted! nonce={share['nonce']} hashrate={hashrate:.0f}H/s")
+                    print(f'[gitmine] SHARE #{shares_found} nonce={share["nonce"]} hr={nonce/elapsed:.0f}H/s')
             nonce += 1
 
-        # Heartbeat every 60s
-        if int(now) % 60 < 2:
+        if int(now) % 60 < 1:
             elapsed = time.time() - start
-            hashrate = (nonce / elapsed) if elapsed > 0 else 0
-            print(f"[gitmine] nonce={nonce} hashrate={hashrate:.0f}H/s shares={shares_found}")
+            print(f'[gitmine] nonce={nonce} hr={nonce/elapsed:.0f}H/s shares={shares_found}')
 
 
-# ─────────────────────────── Entrypoint
+# ─────────────────── Entry
 
-if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="GitMine — Git-native CPU/GPU miner")
-    ap.add_argument("--coin",    required=True,  choices=["FNNC", "TTY"], help="Coin to mine")
-    ap.add_argument("--address", required=True,  help="Your payout address")
-    ap.add_argument("--rig",     default="rig-001", help="Rig ID (default: rig-001)")
-    ap.add_argument("--pool",    default="https://5mil.github.io/gitmine-tty", help="Pool Pages base URL")
+if __name__ == '__main__':
+    ap = argparse.ArgumentParser(description='GitMine — Git-native CPU/GPU miner')
+    ap.add_argument('--config',  help='Path to gitmine.json (downloaded from dashboard)')
+    ap.add_argument('--coin',    choices=['FNNC', 'TTY'], help='Coin to mine')
+    ap.add_argument('--address', help='Your payout address')
+    ap.add_argument('--rig',     default='rig-001', help='Rig ID')
+    ap.add_argument('--pool',    default='https://5mil.github.io/gitmine-tty', help='Pool URL')
+    ap.add_argument('--threads', type=int, default=1, help='CPU threads')
     args = ap.parse_args()
 
+    if args.config:
+        cfg      = load_config(args.config)
+        coin     = cfg['coin']
+        address  = cfg['address']
+        rig_id   = cfg.get('rig_id', 'rig-001')
+        pool_url = cfg.get('pool', args.pool)
+        threads  = cfg.get('threads', 1)
+        sk       = key_from_pkcs8_hex(cfg['private_key'])
+        import nacl.encoding
+        pubkey_hex = sk.verify_key.encode(encoder=nacl.encoding.HexEncoder).decode()
+    else:
+        if not args.coin or not args.address:
+            ap.error('Provide --config OR both --coin and --address')
+        coin     = args.coin
+        address  = args.address
+        rig_id   = args.rig
+        pool_url = args.pool
+        threads  = args.threads
+        sk, pubkey_hex = load_or_create_key(rig_id)
+
     try:
-        mine(args.coin, args.address, args.rig, args.pool)
+        mine(coin, address, rig_id, pool_url, sk, pubkey_hex, threads)
     except KeyboardInterrupt:
-        print("\n[gitmine] Stopped.")
+        print('\n[gitmine] Stopped.')
