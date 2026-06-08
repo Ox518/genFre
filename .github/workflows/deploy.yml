@@ -1,0 +1,72 @@
+name: Build & Deploy Pool Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pool-server/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Rust toolchain + cache ─────────────────────────────────────────────
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: pool-server
+
+      - name: Install musl tools
+        run: sudo apt-get install -y musl-tools
+
+      # ── Build static binary ────────────────────────────────────────────────
+      - name: Build release binary (musl static)
+        working-directory: pool-server
+        run: |
+          cargo build --release --target x86_64-unknown-linux-musl
+          ls -lh target/x86_64-unknown-linux-musl/release/gitmine-pool
+
+      # ── Deploy over SSH ────────────────────────────────────────────────────
+      - name: Deploy to VPS
+        env:
+          DEPLOY_KEY:  ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          echo "$DEPLOY_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+          # Upload binary
+          scp -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              pool-server/target/x86_64-unknown-linux-musl/release/gitmine-pool \
+              ${DEPLOY_USER}@${DEPLOY_HOST}:/opt/gitmine/gitmine-pool.new
+
+          # Upload config
+          scp -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              config/server.yaml \
+              ${DEPLOY_USER}@${DEPLOY_HOST}:/opt/gitmine/config/server.yaml
+
+          # Atomic swap + restart
+          ssh -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              ${DEPLOY_USER}@${DEPLOY_HOST} \
+              'mv /opt/gitmine/gitmine-pool.new /opt/gitmine/gitmine-pool && \
+               chmod +x /opt/gitmine/gitmine-pool && \
+               sudo systemctl restart gitmine-pool && \
+               sudo systemctl is-active gitmine-pool'
+
+          rm -f /tmp/deploy_key

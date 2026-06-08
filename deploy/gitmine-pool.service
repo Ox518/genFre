@@ -1,0 +1,31 @@
+[Unit]
+Description=GitMine TTY Pool Server
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gitmine
+Group=gitmine
+WorkingDirectory=/opt/gitmine
+ExecStart=/opt/gitmine/gitmine-pool
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gitmine-pool
+
+# Environment — DATABASE_URL is the only required secret
+# Set additional env vars here or in /etc/gitmine/env
+EnvironmentFile=-/etc/gitmine/env
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/gitmine
+PrivateTmp=yes
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
