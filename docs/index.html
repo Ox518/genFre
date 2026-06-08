@@ -57,7 +57,6 @@
     .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;}
     .dot-on{background:var(--green);box-shadow:0 0 5px var(--green);}
     .dot-off{background:var(--muted2);}
-    /* login */
     #login-screen{display:flex;flex-direction:column;align-items:center;
                   justify-content:center;min-height:82vh;text-align:center;gap:1.4rem;}
     .login-logo{font-size:2.6rem;font-weight:bold;}
@@ -65,7 +64,6 @@
     .login-sub{color:var(--muted);font-size:.84rem;max-width:360px;line-height:1.75;}
     .login-pills{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;}
     .login-note{font-size:.7rem;color:var(--muted2);max-width:300px;line-height:1.6;}
-    /* modal */
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.88);
               display:flex;align-items:center;justify-content:center;z-index:100;}
     .modal{background:var(--card);border:1px solid var(--border);border-radius:10px;
@@ -78,7 +76,6 @@
           border-top-color:var(--fnnc);border-radius:50%;animation:rot .8s linear infinite;
           vertical-align:middle;margin-right:.35rem;}
     @keyframes rot{to{transform:rotate(360deg);}}
-    /* connect card */
     .connect-card{border-color:#f9731640;}
     .addr-pill{display:inline-flex;align-items:center;gap:.5rem;background:#7c2d1212;
                border:1px solid #f9731640;border-radius:6px;padding:.4rem .8rem;
@@ -103,7 +100,6 @@
          cursor:pointer;border:1px solid var(--border);background:transparent;
          color:var(--muted);transition:all .15s;}
     .sft.active{border-color:var(--muted);color:var(--text);background:#222;}
-    /* difficulty row */
     .diff-row{display:flex;align-items:center;gap:.5rem;margin:.6rem 0;flex-wrap:wrap;}
     .diff-row label{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;}
     .diff-row input[type=number]{background:var(--bg);border:1px solid var(--border);border-radius:5px;
@@ -116,26 +112,21 @@
         color:var(--muted);transition:all .12s;}
     .dp:hover,.dp.on{border-color:var(--fnnc);color:var(--fnnc);background:#7c2d1210;}
     .diff-hint{font-size:.66rem;color:var(--muted2);margin-top:.25rem;line-height:1.5;}
-    /* suffix edit */
     .suffix-row{display:flex;gap:.4rem;align-items:center;margin-bottom:.9rem;flex-wrap:wrap;}
     .suffix-row input{background:var(--bg);border:1px solid var(--border);border-radius:5px;
                       color:var(--text);font-family:inherit;font-size:.82rem;
                       padding:.32rem .6rem;width:140px;outline:none;transition:border-color .15s;}
     .suffix-row input:focus{border-color:var(--fnnc);}
-    /* stats */
     .rig-stat{display:flex;justify-content:space-between;align-items:center;
               padding:.42rem 0;border-bottom:1px solid #181818;font-size:.8rem;}
     .rig-stat:last-child{border-bottom:none;}
     .rig-stat .k{color:var(--muted);}
-    /* workers list */
     .worker-row{display:flex;justify-content:space-between;align-items:center;
                 padding:.38rem 0;border-bottom:1px solid #181818;font-size:.78rem;}
     .worker-row:last-child{border-bottom:none;}
     .worker-name{color:var(--fnnc);font-weight:bold;}
-    /* realtime flash */
     @keyframes flash{0%,100%{background:transparent}50%{background:#22c55e18;}}
     .flash{animation:flash .6s ease;}
-    /* supabase status badge */
     .sb-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.65rem;
               padding:.15rem .4rem;border-radius:3px;border:1px solid var(--border);color:var(--muted);}
     .sb-badge.connected{border-color:#22c55e40;color:var(--green);}
@@ -148,14 +139,10 @@
 </head>
 <body>
 
-<!-- ── SUPABASE CONFIG ───────────────────────────────────────────────────
-     Fill in your project values before deploying.
-     The anon key is safe to expose — RLS restricts all user data.
-─────────────────────────────────────────────────────────────────────── -->
 <script>
 window.GITMINE_CONFIG = {
-  SUPABASE_URL:      'https://REPLACE_PROJECT.supabase.co',
-  SUPABASE_ANON_KEY: 'REPLACE_ANON_KEY',
+  SUPABASE_URL:      'https://wfabhxfpzqrdhlkidkcl.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_mwnZPcvpFQruWwH2gyabxw_MjFEWb8_',
   STRATUM:           'stratum+tcp://pool.gitmine.io:3333',
   GH_CLIENT_ID:      'Ov23liGGG7hLrjRN5iVO',
   REPO_OWNER:        '5mil',
@@ -170,7 +157,6 @@ window.GITMINE_CONFIG = {
   </div>
 </nav>
 
-<!-- Login -->
 <div id="login-screen">
   <div class="login-logo">&#9935; Git<span>Mine</span></div>
   <div class="login-sub">A Git-native mining pool.<br>Point cgminer, sgminer, or any Stratum miner here and start earning.</div>
@@ -187,7 +173,6 @@ window.GITMINE_CONFIG = {
   <div class="login-note">Uses your GitHub account. No separate password or config needed.</div>
 </div>
 
-<!-- Device Flow Modal -->
 <div class="modal-bg" id="device-modal" style="display:none">
   <div class="modal">
     <h2>Authorize GitMine</h2>
@@ -201,10 +186,8 @@ window.GITMINE_CONFIG = {
   </div>
 </div>
 
-<!-- App -->
 <main id="app" style="display:none">
 
-  <!-- Pool stats row -->
   <div class="section">
     <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
       <span>Pool</span>
@@ -225,15 +208,12 @@ window.GITMINE_CONFIG = {
     </div>
   </div>
 
-  <!-- Connect + My Stats -->
   <div class="section grid grid-2">
 
-    <!-- Connect card -->
     <div>
       <div class="section-title">Connect Your Miner</div>
       <div class="card connect-card">
 
-        <!-- Address -->
         <div style="margin-bottom:.9rem">
           <div class="card-label">Mining Address (Stratum username)</div>
           <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.3rem">
@@ -252,13 +232,11 @@ window.GITMINE_CONFIG = {
           <div style="font-size:.67rem;color:var(--muted2)">Any suffix &mdash; <code>username.rig1</code>, <code>username.asic</code>, etc.</div>
         </div>
 
-        <!-- Coin -->
         <div class="coin-tabs">
           <button class="ctab" id="ctab-fnnc" onclick="selectCoin('FNNC')">FNNC &mdash; Fennec</button>
           <button class="ctab" id="ctab-tty"  onclick="selectCoin('TTY')">TTY &mdash; Trinity</button>
         </div>
 
-        <!-- Difficulty via password field -->
         <div>
           <div class="cmd-label">Share Difficulty (Stratum password field)</div>
           <div class="diff-row">
@@ -280,7 +258,6 @@ window.GITMINE_CONFIG = {
           </div>
         </div>
 
-        <!-- Software -->
         <div style="margin-top:.75rem">
           <div class="cmd-label">Mining Software</div>
           <div class="soft-row">
@@ -291,14 +268,12 @@ window.GITMINE_CONFIG = {
           </div>
         </div>
 
-        <!-- Command -->
         <div class="cmd-block">
           <div class="cmd-label">Command</div>
           <button class="btn btn-sm copy-btn" onclick="cp('cmd-out')">&#9634; Copy</button>
           <pre id="cmd-out"></pre>
         </div>
 
-        <!-- Config snippet -->
         <div class="cmd-block">
           <div class="cmd-label">Config file snippet</div>
           <button class="btn btn-sm copy-btn" onclick="cp('cfg-out')">&#9634; Copy</button>
@@ -311,7 +286,6 @@ window.GITMINE_CONFIG = {
       </div>
     </div>
 
-    <!-- My Stats -->
     <div>
       <div class="section-title">My Stats</div>
       <div class="card" id="my-stats-card">
@@ -326,7 +300,6 @@ window.GITMINE_CONFIG = {
         <div class="rig-stat"><span class="k">Status</span><span id="my-status"><span class="dot dot-off"></span>Waiting</span></div>
       </div>
 
-      <!-- My Workers -->
       <div style="margin-top:1rem">
         <div class="section-title">My Workers</div>
         <div class="card">
@@ -337,7 +310,6 @@ window.GITMINE_CONFIG = {
 
   </div>
 
-  <!-- All Miners -->
   <div class="section">
     <div class="section-title">All Miners</div>
     <div class="card">
@@ -363,21 +335,17 @@ window.GITMINE_CONFIG = {
 <div id="toast"></div>
 
 <script>
-// ─── Config ────────────────────────────────────────────────────────────────
 const CFG       = window.GITMINE_CONFIG;
 const CLIENT_ID = CFG.GH_CLIENT_ID;
 const STRATUM   = CFG.STRATUM;
 
-// ─── Supabase ──────────────────────────────────────────────────────────────
+// Supabase client — always init since values are live
 let _sb = null;
 function sb(){
-  if(!_sb && CFG.SUPABASE_URL && !CFG.SUPABASE_URL.includes('REPLACE')){
-    _sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
-  }
+  if(!_sb) _sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
   return _sb;
 }
 
-// ─── State ─────────────────────────────────────────────────────────────────
 let ghToken = localStorage.getItem('gh_token');
 let ghUser  = JSON.parse(localStorage.getItem('gh_user') || 'null');
 let myAddr  = localStorage.getItem('my_addr') || '';
@@ -387,7 +355,6 @@ let myDiff  = parseInt(localStorage.getItem('my_diff') || '1');
 let _poll   = null;
 let _realtimeSub = null;
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
 function toast(m,d=2400){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),d);}
 function cp(id){navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>toast('Copied!'));}
 function fmtH(h){if(!h||h<1)return'0 H/s';if(h>1e9)return(h/1e9).toFixed(2)+' GH/s';if(h>1e6)return(h/1e6).toFixed(2)+' MH/s';if(h>1e3)return(h/1e3).toFixed(2)+' KH/s';return h.toFixed(0)+' H/s';}
@@ -401,10 +368,9 @@ function sbStatus(ok){
   const el=document.getElementById('sb-status');
   if(!el)return;
   el.className='sb-badge '+(ok?'connected':'error');
-  el.textContent=(ok?'\u2022 DB live':'\u2022 DB offline');
+  el.textContent=ok?'\u2022 DB live':'\u2022 DB offline';
 }
 
-// ─── GitHub Device Flow ────────────────────────────────────────────────────
 async function startLogin(){
   const r=await fetch('https://github.com/login/device/code',{
     method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},
@@ -435,17 +401,14 @@ async function onLogin(token){
 }
 function logout(){
   if(!confirm('Sign out?'))return;
-  if(_realtimeSub&&sb())sb().removeChannel(_realtimeSub);
+  if(_realtimeSub)sb().removeChannel(_realtimeSub);
   ['gh_token','gh_user','my_addr','my_coin','my_soft','my_diff'].forEach(k=>localStorage.removeItem(k));
   location.reload();
 }
 
-// ─── Supabase: upsert user + default worker ────────────────────────────────
 async function sbUpsertUser(){
   const client=sb();
-  if(!client){sbStatus(false);return;}
   try{
-    // Call the github-login edge function to get a Supabase session
     const res=await fetch(`${CFG.SUPABASE_URL}/functions/v1/github-login`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -457,15 +420,13 @@ async function sbUpsertUser(){
         await client.auth.verifyOtp({email:data.email,token:data.token_hash,type:'magiclink'});
       }
     }
-    // Upsert users table
     await client.from('users').upsert({
       github_id:    ghUser.id,
       github_login: ghUser.login,
       avatar_url:   ghUser.avatar_url,
       last_seen_at: new Date().toISOString()
     },{onConflict:'github_login'});
-    // Ensure default worker
-    await sbEnsureWorker(myAddr, myCoin);
+    await sbEnsureWorker(myAddr,myCoin);
     sbStatus(true);
   }catch(e){
     console.warn('[sb] upsert user:',e);
@@ -473,33 +434,24 @@ async function sbUpsertUser(){
   }
 }
 
-async function sbEnsureWorker(workerName, coin){
-  const client=sb();
-  if(!client)return;
+async function sbEnsureWorker(workerName,coin){
   try{
-    const {data}=await client.from('workers').select('id').eq('worker_name',workerName).maybeSingle();
-    if(!data){
-      await client.from('workers').insert({worker_name:workerName,coin});
-    }
+    const{data}=await sb().from('workers').select('id').eq('worker_name',workerName).maybeSingle();
+    if(!data) await sb().from('workers').insert({worker_name:workerName,coin});
   }catch(e){console.warn('[sb] ensure worker:',e);}
 }
 
-async function sbSaveWorker(workerName, coin){
-  const client=sb();
-  if(!client)return;
+async function sbSaveWorker(workerName,coin){
   try{
-    await client.from('workers').upsert({worker_name:workerName,coin},{onConflict:'worker_name'});
+    await sb().from('workers').upsert({worker_name:workerName,coin},{onConflict:'worker_name'});
   }catch(e){console.warn('[sb] save worker:',e);}
 }
 
-// ─── App shell ─────────────────────────────────────────────────────────────
 function showApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('nav-right').innerHTML=
-    `<img src="${ghUser.avatar_url}" alt="">
-     <span>${ghUser.login}</span>
-     <button class="btn btn-sm" onclick="logout()">Sign out</button>`;
+    `<img src="${ghUser.avatar_url}" alt=""><span>${ghUser.login}</span><button class="btn btn-sm" onclick="logout()">Sign out</button>`;
   document.getElementById('prefix-label').textContent=ghUser.login;
   document.getElementById('stratum-display').textContent=STRATUM;
   document.getElementById('diff-input').value=myDiff;
@@ -511,7 +463,6 @@ function showApp(){
   setInterval(loadStats,30000);
 }
 
-// ─── Address ───────────────────────────────────────────────────────────────
 function renderAddr(){
   document.getElementById('addr-display').textContent=myAddr;
   document.getElementById('my-addr').textContent=myAddr;
@@ -534,18 +485,16 @@ function saveAddr(){
 }
 function cancelAddr(){document.getElementById('suffix-edit').style.display='none';}
 
-// ─── Coin ──────────────────────────────────────────────────────────────────
 function selectCoin(c,save=true){
   myCoin=c;if(save)localStorage.setItem('my_coin',c);
   document.getElementById('ctab-fnnc').className='ctab'+(c==='FNNC'?' on-fnnc':'');
-  document.getElementById('ctab-tty').className ='ctab'+(c==='TTY' ?' on-tty' :'');
+  document.getElementById('ctab-tty').className ='ctab'+(c==='TTY' ?' on-tty':'');
   document.getElementById('my-coin').innerHTML=`<span class="tag tag-${c.toLowerCase()}">${c}</span>`;
   document.getElementById('sft-xmrig').style.display=c==='FNNC'?'':'none';
   if(c==='TTY'&&mySoft==='xmrig')setSoft('cgminer',true);
   buildCmd();
 }
 
-// ─── Software ──────────────────────────────────────────────────────────────
 function setSoft(s,save=true){
   mySoft=s;if(save)localStorage.setItem('my_soft',s);
   ['cgminer','sgminer','xmrig','bfgminer'].forEach(x=>{
@@ -554,41 +503,36 @@ function setSoft(s,save=true){
   buildCmd();
 }
 
-// ─── Difficulty ────────────────────────────────────────────────────────────
 function setDiff(v){
   myDiff=v;
   localStorage.setItem('my_diff',v);
   document.getElementById('diff-input').value=v;
-  // highlight active preset
   document.querySelectorAll('.dp').forEach(b=>{
-    b.classList.toggle('on', parseInt(b.getAttribute('onclick').match(/\d+/)?.[0])||0 === v);
+    const m=b.getAttribute('onclick').match(/\d+/);
+    b.classList.toggle('on',m&&parseInt(m[0])===v);
   });
   buildCmd();
 }
 
-// ─── Build command ─────────────────────────────────────────────────────────
 function buildCmd(){
   myDiff=parseInt(document.getElementById('diff-input')?.value)||1;
   localStorage.setItem('my_diff',myDiff);
-
   const addr=myAddr||'username.gitmine';
   const algo=myCoin==='FNNC'?'yescryptr16':'sha256d';
-  // password field: "d=N" for explicit difficulty, "x" for auto/vardiff
   const pass=myDiff<=1?'x':`d=${myDiff}`;
   const s=STRATUM;
   const s2=s.replace('stratum+tcp://','').replace(':3333',':3334');
   let cmd='',cfg='';
-
   if(mySoft==='cgminer'){
     cmd=`cgminer --url ${s} \\\n  --user ${addr} --pass ${pass} \\\n  --algorithm ${algo}`;
     cfg=`"pools": [{\n  "url":  "${s}",\n  "user": "${addr}",\n  "pass": "${pass}"\n}]`;
-  } else if(mySoft==='sgminer'){
+  }else if(mySoft==='sgminer'){
     cmd=`sgminer --url ${s} \\\n  --user ${addr} --pass ${pass} \\\n  --algorithm ${algo}`;
     cfg=`"pools": [{\n  "url":  "${s}",\n  "user": "${addr}",\n  "pass": "${pass}"\n}]`;
-  } else if(mySoft==='bfgminer'){
+  }else if(mySoft==='bfgminer'){
     cmd=`bfgminer --url ${s} \\\n  --user ${addr} --pass ${pass}`;
     cfg=`"pools": [{\n  "url":  "${s}",\n  "user": "${addr}",\n  "pass": "${pass}"\n}]`;
-  } else if(mySoft==='xmrig'){
+  }else if(mySoft==='xmrig'){
     cmd=`xmrig --url ${s2} \\\n  --user ${addr} --pass ${pass} \\\n  --algo yescryptr16`;
     cfg=`"pools": [{\n  "url":  "${s2}",\n  "user": "${addr}",\n  "pass": "${pass}",\n  "algo": "yescryptr16"\n}]`;
   }
@@ -596,101 +540,84 @@ function buildCmd(){
   document.getElementById('cfg-out').textContent=cfg;
 }
 
-// ─── Load stats (Supabase + fallback JSON) ─────────────────────────────────
 async function loadStats(){
-  const client=sb();
-  if(client){
-    try{
-      await Promise.all([loadPoolStats(client), loadMyStats(client), loadAllMiners(client), loadMyWorkers(client)]);
-      document.getElementById('last-update').textContent='Updated '+new Date().toLocaleTimeString();
-      return;
-    }catch(e){console.warn('[sb] loadStats:',e);}
-  }
-  // fallback: static JSON files
   try{
-    const[tr,sr]=await Promise.all([fetch('template.json?_='+Date.now()),fetch('stats.json?_='+Date.now())]);
-    if(tr.ok){const t=await tr.json();applyTemplate(t);}
-    if(sr.ok){const s=await sr.json();applyStats(s);}
+    await Promise.all([loadPoolStats(),loadMyStats(),loadAllMiners(),loadMyWorkers()]);
     document.getElementById('last-update').textContent='Updated '+new Date().toLocaleTimeString();
-  }catch(e){}
+  }catch(e){
+    try{
+      const[tr,sr]=await Promise.all([fetch('template.json?_='+Date.now()),fetch('stats.json?_='+Date.now())]);
+      if(tr.ok){const t=await tr.json();applyTemplate(t);}
+      if(sr.ok){const s=await sr.json();applyStats(s);}
+      document.getElementById('last-update').textContent='Updated '+new Date().toLocaleTimeString();
+    }catch(e2){}
+  }
 }
 
-async function loadPoolStats(client){
-  const{data}=await client.from('pool_stats').select('*').order('snapshot_at',{ascending:false}).limit(2);
+async function loadPoolStats(){
+  const{data,error}=await sb().from('pool_stats').select('*').order('snapshot_at',{ascending:false}).limit(2);
+  if(error)throw error;
   if(!data||!data.length)return;
-  const fnnc=data.find(r=>r.coin==='FNNC'), tty=data.find(r=>r.coin==='TTY');
+  const fnnc=data.find(r=>r.coin==='FNNC'),tty=data.find(r=>r.coin==='TTY');
   const latest=data[0];
   const c=(latest.coin||'').toLowerCase();
   document.getElementById('t-coin').innerHTML=`<span class="tag tag-${c}">${latest.coin||'?'}</span>`;
   document.getElementById('t-detail').textContent=`${latest.template_algo||''} | height ${latest.block_height||'?'}`;
-  const tot=(fnnc?.total_shares||0)+(tty?.total_shares||0);
-  document.getElementById('s-total').textContent=tot;
+  document.getElementById('s-total').textContent=(fnnc?.total_shares||0)+(tty?.total_shares||0);
   document.getElementById('hr-fnnc').textContent=fmtH((fnnc?.hashrate_mhs||0)*1e6);
   document.getElementById('hr-tty').textContent =fmtH((tty?.hashrate_mhs||0)*1e6);
   sbStatus(true);
 }
 
-async function loadMyStats(client){
+async function loadMyStats(){
   if(!myAddr)return;
-  // shares
-  const{data:shares}=await client.from('shares')
+  const{data:shares,error}=await sb().from('shares')
     .select('coin,accepted,submitted_at')
     .eq('worker_name',myAddr)
     .order('submitted_at',{ascending:false})
     .limit(1000);
-  // balances
-  const{data:bals}=await client.from('balances').select('coin,amount');
+  if(error)throw error;
+  const{data:bals}=await sb().from('balances').select('coin,amount');
   const total=shares?.filter(s=>s.accepted).length||0;
   const fnnc =shares?.filter(s=>s.accepted&&s.coin==='FNNC').length||0;
   const tty  =shares?.filter(s=>s.accepted&&s.coin==='TTY').length||0;
   const lastTs=shares?.[0]?.submitted_at||null;
-  const now=Date.now();
-  const alive=lastTs&&(now-new Date(lastTs).getTime())<300000;
+  const alive=lastTs&&(Date.now()-new Date(lastTs).getTime())<300000;
   document.getElementById('my-shares').textContent=total;
   document.getElementById('my-fnnc').textContent=fnnc;
   document.getElementById('my-tty').textContent=tty;
   document.getElementById('my-last').textContent=ago(lastTs);
   document.getElementById('my-status').innerHTML=`<span class="dot ${alive?'dot-on':'dot-off'}"></span>${alive?'Active':'Waiting'}`;
-  const bf=bals?.find(b=>b.coin==='FNNC')?.amount||0;
-  const bt=bals?.find(b=>b.coin==='TTY')?.amount||0;
-  document.getElementById('my-bal-fnnc').textContent=parseFloat(bf).toFixed(8);
-  document.getElementById('my-bal-tty').textContent =parseFloat(bt).toFixed(8);
+  document.getElementById('my-bal-fnnc').textContent=parseFloat(bals?.find(b=>b.coin==='FNNC')?.amount||0).toFixed(8);
+  document.getElementById('my-bal-tty').textContent =parseFloat(bals?.find(b=>b.coin==='TTY')?.amount||0).toFixed(8);
 }
 
-async function loadMyWorkers(client){
-  if(!client)client=sb();
-  if(!client)return;
-  const{data}=await client.from('workers').select('worker_name,coin,created_at').order('created_at');
+async function loadMyWorkers(){
+  const{data}=await sb().from('workers').select('worker_name,coin,created_at').order('created_at');
   const el=document.getElementById('workers-list');
-  if(!data||!data.length){
-    el.innerHTML='<div style="color:var(--muted);font-size:.77rem">No workers yet</div>';
-    return;
-  }
+  if(!data||!data.length){el.innerHTML='<div style="color:var(--muted);font-size:.77rem">No workers yet</div>';return;}
   el.innerHTML=data.map(w=>{
-    const isActive=w.worker_name===myAddr;
+    const active=w.worker_name===myAddr;
     return`<div class="worker-row">
-      <span class="worker-name" style="${isActive?'':'color:var(--text)'}">${w.worker_name}${isActive?' <span style="color:var(--muted);font-weight:normal;font-size:.65rem">(active)</span>':''}</span>
+      <span class="worker-name" style="${active?'':'color:var(--text)'}">${w.worker_name}${active?' <span style="color:var(--muted);font-weight:normal;font-size:.65rem">(active)</span>':''}</span>
       <span class="tag tag-${w.coin.toLowerCase()}">${w.coin}</span>
     </div>`;
   }).join('');
 }
 
-async function loadAllMiners(client){
-  const{data}=await client.from('workers').select(`
-    worker_name, coin,
-    shares(coin, accepted, difficulty, submitted_at)
-  `).limit(100);
+async function loadAllMiners(){
+  const{data}=await sb().from('workers').select('worker_name,coin,shares(coin,accepted,difficulty,submitted_at)').limit(100);
   if(!data)return;
   const tbody=document.getElementById('miner-table');
   if(!data.length){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted)">No miners yet</td></tr>';return;}
   const now=Date.now();
   const rows=data.map(w=>{
-    const accepted=w.shares?.filter(s=>s.accepted)||[];
-    const lastShare=w.shares?.sort((a,b)=>new Date(b.submitted_at)-new Date(a.submitted_at))[0]||null;
-    const lastTs=lastShare?.submitted_at||null;
+    const acc=w.shares?.filter(s=>s.accepted)||[];
+    const last=w.shares?.sort((a,b)=>new Date(b.submitted_at)-new Date(a.submitted_at))[0]||null;
+    const lastTs=last?.submitted_at||null;
     const alive=lastTs&&(now-new Date(lastTs).getTime())<300000;
-    const avgDiff=accepted.length?accepted.reduce((a,s)=>a+(parseFloat(s.difficulty)||1),0)/accepted.length:0;
-    return{...w,total:accepted.length,lastTs,alive,avgDiff};
+    const avgD=acc.length?acc.reduce((a,s)=>a+(parseFloat(s.difficulty)||1),0)/acc.length:0;
+    return{...w,total:acc.length,lastTs,alive,avgD};
   }).sort((a,b)=>b.total-a.total);
   tbody.innerHTML=rows.map(w=>{
     const short=w.worker_name.length>22?w.worker_name.slice(0,11)+'\u2026'+w.worker_name.slice(-6):w.worker_name;
@@ -698,7 +625,7 @@ async function loadAllMiners(client){
       <td title="${w.worker_name}">${short}</td>
       <td><span class="tag tag-${(w.coin||'').toLowerCase()}">${w.coin||'?'}</span></td>
       <td>${w.total}</td>
-      <td>${w.avgDiff>0?w.avgDiff.toFixed(1):'&mdash;'}</td>
+      <td>${w.avgD>0?w.avgD.toFixed(1):'&mdash;'}</td>
       <td>&mdash;</td>
       <td>${ago(w.lastTs)}</td>
       <td><span class="dot ${w.alive?'dot-on':'dot-off'}"></span>${w.alive?'Active':'Idle'}</td>
@@ -706,30 +633,23 @@ async function loadAllMiners(client){
   }).join('');
 }
 
-// ─── Supabase Realtime: live share updates ─────────────────────────────────
 function subscribeRealtime(){
-  const client=sb();
-  if(!client)return;
-  _realtimeSub=client.channel('shares-live')
+  _realtimeSub=sb().channel('shares-live')
     .on('postgres_changes',{
       event:'INSERT',schema:'public',table:'shares',
       filter:`worker_name=eq.${myAddr}`
     },payload=>{
       const row=payload.new;
-      // Flash the stats card
-      document.getElementById('my-stats-card').classList.remove('flash');
-      void document.getElementById('my-stats-card').offsetWidth; // reflow
-      document.getElementById('my-stats-card').classList.add('flash');
+      const card=document.getElementById('my-stats-card');
+      card.classList.remove('flash');
+      void card.offsetWidth;
+      card.classList.add('flash');
       toast(`\u2713 Share accepted (${row.coin}, d=${parseFloat(row.difficulty).toFixed(1)})`);
-      // Refresh stats without full reload
-      if(client)loadMyStats(client);
+      loadMyStats();
     })
-    .subscribe(status=>{
-      sbStatus(status==='SUBSCRIBED');
-    });
+    .subscribe(status=>sbStatus(status==='SUBSCRIBED'));
 }
 
-// ─── Fallback: apply static JSON data ─────────────────────────────────────
 function applyTemplate(t){
   const c=(t.coin||'').toLowerCase();
   document.getElementById('t-coin').innerHTML=`<span class="tag tag-${c}">${t.coin||'?'}</span>`;
@@ -741,10 +661,7 @@ function applyStats(s){
   document.getElementById('hr-tty').textContent =fmtH(s.coins?.tty?.hashrate);
 }
 
-// ─── Boot ──────────────────────────────────────────────────────────────────
-if(ghToken&&ghUser){
-  sbUpsertUser().then(showApp);
-}
+if(ghToken&&ghUser) sbUpsertUser().then(showApp);
 </script>
 </body>
 </html>
