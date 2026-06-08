@@ -1,5 +1,5 @@
 listen_addr: "0.0.0.0:3333"
-# Optional here; recommended to set via env:
-#   DATABASE_URL=postgres://user:pass@host:5432/postgres
-# or GITMINE_POOL__DATABASE_URL
+# DATABASE_URL is injected via environment variable at runtime.
+# Set on your server: export DATABASE_URL='postgresql://postgres:...@db.wfabhxfpzqrdhlkidkcl.supabase.co:5432/postgres'
+# Set in GitHub Actions secrets as DATABASE_URL for CI/deploy steps.
 database_url: ""
