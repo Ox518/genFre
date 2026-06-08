@@ -5,131 +5,139 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GitMine Pool</title>
   <style>
-    :root {
-      --bg:#0a0a0a; --card:#141414; --card2:#1c1c1c; --border:#272727;
-      --text:#e8e8e8; --muted:#666; --muted2:#444;
-      --fnnc:#f97316; --tty:#3b82f6;
-      --green:#22c55e; --red:#ef4444;
+    :root{
+      --bg:#0a0a0a;--card:#141414;--card2:#1c1c1c;--border:#272727;
+      --text:#e8e8e8;--muted:#666;--muted2:#444;
+      --fnnc:#f97316;--tty:#3b82f6;--green:#22c55e;--red:#ef4444;
     }
     *{box-sizing:border-box;margin:0;padding:0;}
     body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;}
+    a{color:inherit;}
 
     nav{display:flex;align-items:center;justify-content:space-between;
-        padding:.9rem 1.5rem;border-bottom:1px solid var(--border);}
+        padding:.85rem 1.5rem;border-bottom:1px solid var(--border);}
     .logo{font-size:1rem;font-weight:bold;letter-spacing:.05em;}
     .logo span{color:var(--fnnc);}
-    #nav-right{display:flex;align-items:center;gap:.75rem;font-size:.8rem;}
+    #nav-right{display:flex;align-items:center;gap:.7rem;font-size:.8rem;}
     #nav-right img{width:26px;height:26px;border-radius:50%;border:1px solid var(--border);}
 
-    .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;
+    .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.42rem .85rem;
          border-radius:5px;font-family:inherit;font-size:.8rem;cursor:pointer;
          border:1px solid var(--border);background:var(--card2);color:var(--text);
          text-decoration:none;transition:border-color .15s,background .15s;}
     .btn:hover{border-color:var(--muted);background:#222;}
     .btn-primary{background:var(--fnnc);border-color:var(--fnnc);color:#000;font-weight:bold;}
     .btn-primary:hover{background:#ea6c10;border-color:#ea6c10;}
-    .btn-green{background:var(--green);border-color:var(--green);color:#000;font-weight:bold;}
-    .btn-green:hover{background:#16a34a;border-color:#16a34a;}
-    .btn-sm{padding:.3rem .6rem;font-size:.75rem;}
-    .btn-danger{border-color:var(--red);color:var(--red);}
-    .btn-danger:hover{background:#1a0a0a;}
-    .btn-lg{padding:.7rem 1.6rem;font-size:.95rem;}
+    .btn-sm{padding:.28rem .55rem;font-size:.73rem;}
+    .btn-lg{padding:.65rem 1.5rem;font-size:.92rem;}
 
-    main{max-width:1000px;margin:0 auto;padding:1.5rem;}
+    main{max-width:980px;margin:0 auto;padding:1.4rem;}
     .section{margin-bottom:2rem;}
-    .section-title{font-size:.7rem;color:var(--muted);text-transform:uppercase;
-                   letter-spacing:.1em;margin-bottom:.75rem;}
+    .section-title{font-size:.68rem;color:var(--muted);text-transform:uppercase;
+                   letter-spacing:.1em;margin-bottom:.7rem;}
     .grid{display:grid;gap:1rem;}
     .grid-4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
-    .grid-2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr));}
+    .grid-2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));}
 
-    .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1.1rem;}
-    .card-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;}
-    .card-val{font-size:1.7rem;font-weight:bold;line-height:1;}
-    .card-sub{font-size:.75rem;color:var(--muted);margin-top:.3rem;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem 1.1rem;}
+    .card-label{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem;}
+    .card-val{font-size:1.65rem;font-weight:bold;line-height:1;}
+    .card-sub{font-size:.73rem;color:var(--muted);margin-top:.28rem;}
 
-    .tag{display:inline-block;padding:.15rem .45rem;border-radius:4px;font-size:.68rem;font-weight:bold;}
+    .tag{display:inline-block;padding:.13rem .42rem;border-radius:4px;font-size:.67rem;font-weight:bold;}
     .tag-fnnc{background:#7c2d1220;color:var(--fnnc);border:1px solid #f9731640;}
     .tag-tty {background:#1e3a5f20;color:var(--tty); border:1px solid #3b82f640;}
 
     .table-wrap{overflow-x:auto;}
-    table{width:100%;border-collapse:collapse;font-size:.8rem;}
-    th{color:var(--muted);text-align:left;padding:.5rem .75rem;
-       border-bottom:1px solid var(--border);font-weight:normal;font-size:.7rem;
+    table{width:100%;border-collapse:collapse;font-size:.78rem;}
+    th{color:var(--muted);text-align:left;padding:.45rem .7rem;
+       border-bottom:1px solid var(--border);font-weight:normal;font-size:.68rem;
        text-transform:uppercase;letter-spacing:.06em;}
-    td{padding:.5rem .75rem;border-bottom:1px solid #181818;}
+    td{padding:.45rem .7rem;border-bottom:1px solid #181818;}
     tr:last-child td{border-bottom:none;}
     tr:hover td{background:#181818;}
     .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;}
-    .dot-green{background:var(--green);box-shadow:0 0 5px var(--green);}
-    .dot-red{background:var(--muted2);}
+    .dot-on{background:var(--green);box-shadow:0 0 5px var(--green);}
+    .dot-off{background:var(--muted2);}
 
-    /* ── Login screen ── */
+    /* login */
     #login-screen{display:flex;flex-direction:column;align-items:center;
                   justify-content:center;min-height:82vh;text-align:center;gap:1.4rem;}
-    .login-logo{font-size:2.8rem;font-weight:bold;}
+    .login-logo{font-size:2.6rem;font-weight:bold;}
     .login-logo span{color:var(--fnnc);}
-    .login-sub{color:var(--muted);font-size:.85rem;max-width:340px;line-height:1.7;}
-    .login-coins{display:flex;gap:.5rem;justify-content:center;}
-    .login-note{font-size:.72rem;color:var(--muted2);max-width:300px;line-height:1.6;}
+    .login-sub{color:var(--muted);font-size:.84rem;max-width:340px;line-height:1.75;}
+    .login-pills{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;}
+    .login-note{font-size:.7rem;color:var(--muted2);max-width:300px;line-height:1.6;}
 
-    /* ── Device code modal ── */
-    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.88);
-                    display:flex;align-items:center;justify-content:center;z-index:100;}
+    /* device modal */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.88);
+              display:flex;align-items:center;justify-content:center;z-index:100;}
     .modal{background:var(--card);border:1px solid var(--border);border-radius:10px;
-           padding:2rem;max-width:400px;width:100%;text-align:center;}
-    .modal h2{font-size:1rem;margin-bottom:.5rem;}
-    .modal p{font-size:.8rem;color:var(--muted);margin-bottom:1rem;line-height:1.6;}
-    .device-code{font-size:2.2rem;font-weight:bold;letter-spacing:.2em;
-                 color:var(--fnnc);margin:.75rem 0 1.25rem;}
-    .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);
-             border-top-color:var(--fnnc);border-radius:50%;animation:spin .8s linear infinite;
-             vertical-align:middle;margin-right:.4rem;}
-    @keyframes spin{to{transform:rotate(360deg);}}
+           padding:2rem;max-width:390px;width:100%;text-align:center;}
+    .modal h2{font-size:.95rem;margin-bottom:.45rem;}
+    .modal p{font-size:.78rem;color:var(--muted);margin-bottom:.9rem;line-height:1.65;}
+    .code-big{font-size:2.1rem;font-weight:bold;letter-spacing:.22em;
+              color:var(--fnnc);margin:.6rem 0 1.1rem;}
+    .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--border);
+          border-top-color:var(--fnnc);border-radius:50%;animation:rot .8s linear infinite;
+          vertical-align:middle;margin-right:.35rem;}
+    @keyframes rot{to{transform:rotate(360deg);}}
 
-    /* ── My miner card ── */
-    .miner-hero{display:flex;flex-direction:column;gap:1rem;}
-    .address-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;}
-    .address-display{font-size:1.1rem;font-weight:bold;color:var(--fnnc);
-                     background:#7c2d1210;border:1px solid #f9731630;
-                     border-radius:5px;padding:.35rem .7rem;flex:1;word-break:break-all;}
-    .address-edit{display:none;flex:1;}
-    .address-edit input{background:var(--bg);border:1px solid var(--fnnc);border-radius:5px;
-                        color:var(--text);font-family:inherit;font-size:.9rem;
-                        padding:.35rem .7rem;width:100%;outline:none;}
-    .coin-row{display:flex;gap:.5rem;align-items:center;}
-    .coin-btn{padding:.4rem .9rem;border-radius:5px;font-family:inherit;font-size:.8rem;
-              cursor:pointer;border:1px solid var(--border);background:transparent;
-              color:var(--muted);transition:all .15s;}
-    .coin-btn.active-fnnc{border-color:var(--fnnc);color:var(--fnnc);background:#7c2d1215;}
-    .coin-btn.active-tty {border-color:var(--tty); color:var(--tty); background:#1e3a5f15;}
-    .mining-status{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:.4rem;}
+    /* connect instructions */
+    .connect-card{border-color:var(--fnnc);}
+    .connect-card .section-title{color:var(--fnnc);}
+    .addr-pill{display:inline-flex;align-items:center;gap:.5rem;background:#7c2d1212;
+               border:1px solid #f9731640;border-radius:6px;padding:.4rem .8rem;
+               font-size:1.05rem;font-weight:bold;color:var(--fnnc);word-break:break-all;}
+    .addr-pill button{background:none;border:none;cursor:pointer;color:var(--muted);
+                      font-size:.8rem;padding:0;font-family:inherit;
+                      transition:color .15s;}
+    .addr-pill button:hover{color:var(--text);}
+
+    .coin-tabs{display:flex;gap:.4rem;margin-bottom:1rem;}
+    .ctab{padding:.35rem .8rem;border-radius:5px;font-family:inherit;font-size:.78rem;
+          cursor:pointer;border:1px solid var(--border);background:transparent;
+          color:var(--muted);transition:all .15s;}
+    .ctab.on-fnnc{border-color:var(--fnnc);color:var(--fnnc);background:#7c2d1215;font-weight:bold;}
+    .ctab.on-tty {border-color:var(--tty); color:var(--tty); background:#1e3a5f15;font-weight:bold;}
+
+    .cmd-block{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+               padding:.8rem 1rem;font-size:.76rem;margin:.5rem 0;position:relative;}
+    .cmd-block pre{color:var(--green);white-space:pre-wrap;word-break:break-all;line-height:1.7;}
+    .cmd-block .copy-btn{position:absolute;top:.5rem;right:.5rem;}
+    .cmd-label{font-size:.65rem;color:var(--muted);text-transform:uppercase;
+               letter-spacing:.07em;margin-bottom:.3rem;}
+    .soft-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem;}
+    .sft{padding:.28rem .6rem;border-radius:4px;font-family:inherit;font-size:.72rem;
+         cursor:pointer;border:1px solid var(--border);background:transparent;
+         color:var(--muted);transition:all .15s;}
+    .sft.active{border-color:var(--muted);color:var(--text);background:#222;}
+
+    .suffix-row{display:flex;gap:.4rem;align-items:center;margin-bottom:.9rem;flex-wrap:wrap;}
+    .suffix-row input{background:var(--bg);border:1px solid var(--border);border-radius:5px;
+                      color:var(--text);font-family:inherit;font-size:.82rem;
+                      padding:.32rem .6rem;width:140px;outline:none;transition:border-color .15s;}
+    .suffix-row input:focus{border-color:var(--fnnc);}
+    .suffix-row span{color:var(--muted);font-size:.78rem;}
 
     .rig-stat{display:flex;justify-content:space-between;align-items:center;
-              padding:.45rem 0;border-bottom:1px solid #181818;font-size:.82rem;}
+              padding:.42rem 0;border-bottom:1px solid #181818;font-size:.8rem;}
     .rig-stat:last-child{border-bottom:none;}
-    .rig-stat .key{color:var(--muted);}
+    .rig-stat .k{color:var(--muted);}
 
-    /* ── Advanced / config ── */
-    details{margin-top:1rem;}
-    summary{font-size:.75rem;color:var(--muted);cursor:pointer;padding:.3rem 0;
-            list-style:none;display:flex;align-items:center;gap:.4rem;}
+    details{margin-top:.9rem;}
+    summary{font-size:.73rem;color:var(--muted);cursor:pointer;padding:.28rem 0;
+            list-style:none;display:flex;align-items:center;gap:.35rem;}
     summary::-webkit-details-marker{display:none;}
-    summary::before{content:'▶';font-size:.58rem;transition:transform .2s;}
+    summary::before{content:'\25B6';font-size:.55rem;transition:transform .2s;}
     details[open] summary::before{transform:rotate(90deg);}
-    .config-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;
-                padding:.9rem;margin-top:.6rem;font-size:.75rem;}
-    .config-box pre{color:var(--green);overflow-x:auto;white-space:pre-wrap;word-break:break-all;}
-    .form-row{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.7rem;}
-    .form-row label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
-    .form-row input{background:var(--bg);border:1px solid var(--border);border-radius:5px;
-                    color:var(--text);font-family:inherit;font-size:.82rem;
-                    padding:.45rem .65rem;width:100%;outline:none;transition:border-color .15s;}
-    .form-row input:focus{border-color:var(--fnnc);}
+    .cfg-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+             padding:.85rem;margin-top:.55rem;font-size:.73rem;}
+    .cfg-box pre{color:var(--green);white-space:pre-wrap;word-break:break-all;}
 
-    #toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--card2);
-           border:1px solid var(--border);border-radius:6px;padding:.55rem .95rem;
-           font-size:.78rem;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;}
+    #toast{position:fixed;bottom:1.4rem;right:1.4rem;background:var(--card2);
+           border:1px solid var(--border);border-radius:6px;padding:.5rem .9rem;
+           font-size:.77rem;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;}
     #toast.show{opacity:1;}
   </style>
 </head>
@@ -137,45 +145,36 @@
 
 <nav>
   <div class="logo">&#9935; Git<span>Mine</span></div>
-  <div id="nav-right">
-    <span id="nav-label" style="color:var(--muted)">Not signed in</span>
-  </div>
+  <div id="nav-right"><span style="color:var(--muted);font-size:.8rem">Not signed in</span></div>
 </nav>
 
 <!-- Login -->
 <div id="login-screen">
   <div class="login-logo">&#9935; Git<span>Mine</span></div>
-  <div class="login-sub">A Git-native mining pool.<br>Shares are commits. No middlemen.</div>
-  <div class="login-coins">
+  <div class="login-sub">A Git-native mining pool.<br>Point cgminer or sgminer here and start earning.</div>
+  <div class="login-pills">
     <span class="tag tag-fnnc">FNNC &mdash; YescryptR16</span>
     <span class="tag tag-tty">TTY &mdash; SHA256d</span>
   </div>
   <button class="btn btn-primary btn-lg" onclick="startLogin()">
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
-               0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
-               -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
-               .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15
-               -.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27
-               .68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12
-               .51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48
-               0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
     </svg>
     Sign in with GitHub
   </button>
-  <div class="login-note">Uses your GitHub account for identity. No extra accounts or passwords.</div>
+  <div class="login-note">Uses your GitHub account. No separate password needed.</div>
 </div>
 
-<!-- Device code modal -->
-<div class="modal-backdrop" id="device-modal" style="display:none">
+<!-- Device modal -->
+<div class="modal-bg" id="device-modal" style="display:none">
   <div class="modal">
     <h2>Authorize GitMine</h2>
     <p>Enter this code at <strong>github.com/login/device</strong></p>
-    <div class="device-code" id="device-code-val"></div>
-    <a id="device-open-btn" href="#" target="_blank" class="btn btn-primary" style="margin-bottom:1rem">
+    <div class="code-big" id="dcode"></div>
+    <a id="dlink" href="#" target="_blank" class="btn btn-primary" style="margin-bottom:1rem">
       Open github.com/login/device &rarr;
     </a>
-    <p><span class="spinner"></span>Waiting for authorization&hellip;</p>
+    <p><span class="spin"></span>Waiting for authorization&hellip;</p>
     <button class="btn btn-sm" style="margin-top:1rem" onclick="cancelLogin()">Cancel</button>
   </div>
 </div>
@@ -183,104 +182,99 @@
 <!-- App -->
 <main id="app" style="display:none">
 
-  <!-- Pool overview -->
+  <!-- Pool stats row -->
   <div class="section">
     <div class="section-title">Pool</div>
     <div class="grid grid-4">
-      <div class="card">
-        <div class="card-label">Active Template</div>
+      <div class="card"><div class="card-label">Template</div>
         <div class="card-val" id="t-coin">&mdash;</div>
-        <div class="card-sub" id="t-detail"></div>
-      </div>
-      <div class="card">
-        <div class="card-label">Total Shares</div>
-        <div class="card-val" id="s-total">&mdash;</div>
-      </div>
-      <div class="card">
-        <div class="card-label">FNNC Hashrate</div>
+        <div class="card-sub" id="t-detail"></div></div>
+      <div class="card"><div class="card-label">Total Shares</div>
+        <div class="card-val" id="s-total">&mdash;</div></div>
+      <div class="card"><div class="card-label">FNNC Hashrate</div>
         <div class="card-val" id="hr-fnnc">&mdash;</div>
-        <div class="card-sub">YescryptR16</div>
-      </div>
-      <div class="card">
-        <div class="card-label">TTY Hashrate</div>
+        <div class="card-sub">YescryptR16</div></div>
+      <div class="card"><div class="card-label">TTY Hashrate</div>
         <div class="card-val" id="hr-tty">&mdash;</div>
-        <div class="card-sub">SHA256d</div>
-      </div>
+        <div class="card-sub">SHA256d</div></div>
     </div>
   </div>
 
-  <!-- My miner -->
+  <!-- Connect instructions + my stats -->
   <div class="section grid grid-2">
 
+    <!-- Left: connection card -->
     <div>
-      <div class="section-title">My Miner</div>
-      <div class="card miner-hero">
+      <div class="section-title">Connect Your Miner</div>
+      <div class="card connect-card">
 
         <!-- Mining address -->
-        <div>
-          <div class="card-label">Mining Address</div>
-          <div class="address-row">
-            <div class="address-display" id="addr-display"></div>
-            <div class="address-edit" id="addr-edit">
-              <input id="addr-input" type="text" placeholder="username.anything">
-            </div>
-            <button class="btn btn-sm" id="edit-btn" onclick="toggleAddressEdit()">Edit</button>
-          </div>
-          <div style="font-size:.7rem;color:var(--muted);margin-top:.4rem">
-            Format: <code>githubusername.anything</code> &mdash; default is <code id="default-addr-hint"></code>
-          </div>
-        </div>
-
-        <!-- Coin selector -->
-        <div>
-          <div class="card-label">Coin</div>
-          <div class="coin-row">
-            <button class="coin-btn active-fnnc" id="btn-fnnc" onclick="selectCoin('FNNC')">FNNC &mdash; Fennec</button>
-            <button class="coin-btn" id="btn-tty"  onclick="selectCoin('TTY')">TTY &mdash; Trinity</button>
-          </div>
-        </div>
-
-        <!-- Start / stop -->
-        <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
-          <button class="btn btn-green btn-lg" id="mine-btn" onclick="toggleMining()">&#9654; Start Mining</button>
-          <div class="mining-status" id="mine-status"></div>
-        </div>
-
-        <!-- Advanced: threads + config download -->
-        <details>
-          <summary>Advanced / need help setting up?</summary>
-          <div class="config-box">
-            <div class="form-row" style="margin-bottom:.5rem">
-              <label>CPU Threads</label>
-              <input id="f-threads" type="number" value="1" min="1" max="64" style="width:80px">
-            </div>
-            <p style="color:var(--muted);margin-bottom:.6rem;font-size:.73rem">
-              Or run the miner manually:<br>
-              <code>python miner/git-mine.py --config gitmine.json</code>
-            </p>
-            <pre id="config-preview"></pre>
-            <div style="margin-top:.6rem;display:flex;gap:.5rem">
-              <button class="btn btn-sm" onclick="downloadConfig()">&#8595; Download gitmine.json</button>
-              <button class="btn btn-sm" onclick="copyConfig()">&#9634; Copy</button>
+        <div style="margin-bottom:1rem">
+          <div class="card-label">Your Mining Address</div>
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.35rem">
+            <div class="addr-pill">
+              <span id="addr-display"></span>
+              <button onclick="editAddr()" title="Edit suffix">&#9998;</button>
             </div>
           </div>
-        </details>
+          <div class="suffix-row" id="suffix-edit" style="display:none">
+            <span style="color:var(--muted);font-size:.82rem" id="prefix-label"></span>
+            <span style="color:var(--muted);font-size:.82rem">.</span>
+            <input id="suffix-input" type="text" placeholder="gitmine" maxlength="32">
+            <button class="btn btn-sm" onclick="saveAddr()">Save</button>
+            <button class="btn btn-sm" onclick="cancelAddr()">Cancel</button>
+          </div>
+          <div style="font-size:.68rem;color:var(--muted2)">Any suffix works &mdash; <code>username.rig1</code>, <code>username.home</code>, etc.</div>
+        </div>
+
+        <!-- Coin tabs -->
+        <div class="coin-tabs">
+          <button class="ctab" id="ctab-fnnc" onclick="selectCoin('FNNC')">FNNC &mdash; Fennec</button>
+          <button class="ctab" id="ctab-tty"  onclick="selectCoin('TTY')">TTY &mdash; Trinity</button>
+        </div>
+
+        <!-- Software selector -->
+        <div class="cmd-label">Mining Software</div>
+        <div class="soft-row">
+          <button class="sft active" id="sft-cgminer" onclick="setSoft('cgminer')">cgminer</button>
+          <button class="sft" id="sft-sgminer" onclick="setSoft('sgminer')">sgminer</button>
+          <button class="sft" id="sft-xmrig"   onclick="setSoft('xmrig')">XMRig (FNNC)</button>
+          <button class="sft" id="sft-bfgminer" onclick="setSoft('bfgminer')">bfgminer</button>
+        </div>
+
+        <!-- Command -->
+        <div class="cmd-block">
+          <div class="cmd-label">Run this command</div>
+          <button class="btn btn-sm copy-btn" onclick="copyCmd()">&#9634; Copy</button>
+          <pre id="cmd-out"></pre>
+        </div>
+
+        <!-- Config file snippet -->
+        <div class="cmd-block">
+          <div class="cmd-label">Or add to your config file</div>
+          <button class="btn btn-sm copy-btn" onclick="copyCfg()">&#9634; Copy</button>
+          <pre id="cfg-out"></pre>
+        </div>
+
+        <div style="font-size:.68rem;color:var(--muted);margin-top:.5rem">
+          Pool URL: <code id="pool-url-display"></code>
+        </div>
 
       </div>
     </div>
 
-    <!-- My stats -->
+    <!-- Right: my stats -->
     <div>
       <div class="section-title">My Stats</div>
       <div class="card">
-        <div class="rig-stat"><span class="key">Address</span><span id="my-addr" style="font-size:.75rem;word-break:break-all">&mdash;</span></div>
-        <div class="rig-stat"><span class="key">Coin</span><span id="my-coin">&mdash;</span></div>
-        <div class="rig-stat"><span class="key">Shares</span><span id="my-shares">0</span></div>
-        <div class="rig-stat"><span class="key">FNNC Shares</span><span id="my-fnnc">0</span></div>
-        <div class="rig-stat"><span class="key">TTY Shares</span><span id="my-tty">0</span></div>
-        <div class="rig-stat"><span class="key">Balance</span><span id="my-bal">0.00000000</span></div>
-        <div class="rig-stat"><span class="key">Last Share</span><span id="my-last">never</span></div>
-        <div class="rig-stat"><span class="key">Status</span><span id="my-status"><span class="dot dot-red"></span>Idle</span></div>
+        <div class="rig-stat"><span class="k">Address</span><span id="my-addr" style="font-size:.73rem;word-break:break-all">&mdash;</span></div>
+        <div class="rig-stat"><span class="k">Coin</span><span id="my-coin">&mdash;</span></div>
+        <div class="rig-stat"><span class="k">Shares</span><span id="my-shares">0</span></div>
+        <div class="rig-stat"><span class="k">FNNC Shares</span><span id="my-fnnc">0</span></div>
+        <div class="rig-stat"><span class="k">TTY Shares</span><span id="my-tty">0</span></div>
+        <div class="rig-stat"><span class="k">Balance</span><span id="my-bal">0.00000000</span></div>
+        <div class="rig-stat"><span class="k">Last Share</span><span id="my-last">never</span></div>
+        <div class="rig-stat"><span class="k">Status</span><span id="my-status"><span class="dot dot-off"></span>Waiting</span></div>
       </div>
     </div>
 
@@ -296,298 +290,185 @@
             <th>Address</th><th>Shares</th><th>FNNC</th><th>TTY</th>
             <th>Balance</th><th>Last Share</th><th>Status</th>
           </tr></thead>
-          <tbody id="miner-table">
-            <tr><td colspan="7" style="color:var(--muted)">Loading&hellip;</td></tr>
-          </tbody>
+          <tbody id="miner-table"><tr><td colspan="7" style="color:var(--muted)">Loading&hellip;</td></tr></tbody>
         </table>
       </div>
     </div>
   </div>
 
-  <div style="font-size:.7rem;color:var(--muted);text-align:center;padding:1rem 0">
-    GitMine &mdash;
-    <a href="https://github.com/5mil/gitmine-tty" style="color:var(--muted)" target="_blank">5mil/gitmine-tty</a>
+  <div style="font-size:.68rem;color:var(--muted);text-align:center;padding:.9rem 0">
+    GitMine &mdash; <a href="https://github.com/5mil/gitmine-tty" target="_blank" style="color:var(--muted)">5mil/gitmine-tty</a>
     &nbsp;&mdash;&nbsp;<span id="last-update"></span>
   </div>
 
 </main>
-
 <div id="toast"></div>
 
 <script>
-// ── Config ────────────────────────────────────────────────────────────────
 const CLIENT_ID  = 'Ov23liGGG7hLrjRN5iVO';
 const REPO_OWNER = '5mil';
 const REPO_NAME  = 'gitmine-tty';
-const POOL_URL   = `https://${REPO_OWNER}.github.io/${REPO_NAME}`;
+const STRATUM    = 'stratum+tcp://pool.gitmine.io:3333';  // update when stratum is live
+const POOL_PAGES = `https://${REPO_OWNER}.github.io/${REPO_NAME}`;
 
-// ── State ─────────────────────────────────────────────────────────────────
-let ghToken  = localStorage.getItem('gh_token');
-let ghUser   = JSON.parse(localStorage.getItem('gh_user')  || 'null');
-let myKeys   = JSON.parse(localStorage.getItem('my_keys')  || 'null');
-let myAddr   = localStorage.getItem('my_addr')  || '';
-let myCoin   = localStorage.getItem('my_coin')  || 'FNNC';
-let mining   = false;
-let pollInterval = null;
+// ─ state
+let ghToken = localStorage.getItem('gh_token');
+let ghUser  = JSON.parse(localStorage.getItem('gh_user') || 'null');
+let myAddr  = localStorage.getItem('my_addr') || '';
+let myCoin  = localStorage.getItem('my_coin') || 'FNNC';
+let mySoft  = localStorage.getItem('my_soft') || 'cgminer';
+let _poll   = null;
 
-// ── Helpers ───────────────────────────────────────────────────────────────
-function toast(msg, dur=2500){
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'),dur);
-}
-function fmtH(h){
-  if(!h)return'0 H/s';
-  if(h>1e9)return(h/1e9).toFixed(2)+' GH/s';
-  if(h>1e6)return(h/1e6).toFixed(2)+' MH/s';
-  if(h>1e3)return(h/1e3).toFixed(2)+' KH/s';
-  return h+' H/s';
-}
-function ago(ts){
-  if(!ts)return'never';
-  const d=Math.floor(Date.now()/1000)-ts;
-  if(d<5)return'just now';
-  if(d<60)return d+'s ago';
-  if(d<3600)return Math.floor(d/60)+'m ago';
-  return Math.floor(d/3600)+'h ago';
-}
+// ─ helpers
+function toast(m,d=2400){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),d);}
+function cp(t){navigator.clipboard.writeText(t).then(()=>toast('Copied!'));}
+function fmtH(h){if(!h)return'0 H/s';if(h>1e9)return(h/1e9).toFixed(2)+' GH/s';if(h>1e6)return(h/1e6).toFixed(2)+' MH/s';if(h>1e3)return(h/1e3).toFixed(2)+' KH/s';return h+' H/s';}
+function ago(ts){if(!ts)return'never';const d=Math.floor(Date.now()/1000)-ts;if(d<5)return'just now';if(d<60)return d+'s ago';if(d<3600)return Math.floor(d/60)+'m ago';return Math.floor(d/3600)+'h ago';}
 
-// ── Keygen ────────────────────────────────────────────────────────────────
-async function ensureKeys(){
-  if(myKeys) return;
-  const kp = await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify']);
-  const priv = await crypto.subtle.exportKey('pkcs8', kp.privateKey);
-  const pub  = await crypto.subtle.exportKey('spki',  kp.publicKey);
-  const hex  = b => Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
-  myKeys = {privateKey: hex(priv), publicKey: hex(pub)};
-  localStorage.setItem('my_keys', JSON.stringify(myKeys));
-}
-
-// ── GitHub Device Flow ────────────────────────────────────────────────────
-let _pollTimer = null;
-
+// ─ device flow
 async function startLogin(){
-  const r = await fetch('https://github.com/login/device/code',{
-    method:'POST',
-    headers:{'Accept':'application/json','Content-Type':'application/json'},
-    body: JSON.stringify({client_id: CLIENT_ID, scope:'public_repo read:user'})
+  const r=await fetch('https://github.com/login/device/code',{
+    method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},
+    body:JSON.stringify({client_id:CLIENT_ID,scope:'public_repo read:user'})
   });
-  const d = await r.json();
-  document.getElementById('device-code-val').textContent = d.user_code;
-  document.getElementById('device-open-btn').href = d.verification_uri;
+  const d=await r.json();
+  document.getElementById('dcode').textContent=d.user_code;
+  document.getElementById('dlink').href=d.verification_uri;
   document.getElementById('device-modal').style.display='flex';
-
-  const iv = (d.interval||5)*1000;
-  _pollTimer = setInterval(async()=>{
-    const p = await fetch('https://github.com/login/oauth/access_token',{
-      method:'POST',
-      headers:{'Accept':'application/json','Content-Type':'application/json'},
-      body: JSON.stringify({
-        client_id: CLIENT_ID,
-        device_code: d.device_code,
-        grant_type:'urn:ietf:params:oauth:grant-type:device_code'
-      })
+  _poll=setInterval(async()=>{
+    const p=await fetch('https://github.com/login/oauth/access_token',{
+      method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},
+      body:JSON.stringify({client_id:CLIENT_ID,device_code:d.device_code,grant_type:'urn:ietf:params:oauth:grant-type:device_code'})
     });
-    const t = await p.json();
-    if(t.access_token){
-      clearInterval(_pollTimer);
-      document.getElementById('device-modal').style.display='none';
-      await onLogin(t.access_token);
-    }
-  }, iv);
+    const t=await p.json();
+    if(t.access_token){clearInterval(_poll);document.getElementById('device-modal').style.display='none';await onLogin(t.access_token);}
+  },(d.interval||5)*1000);
 }
-
-function cancelLogin(){
-  clearInterval(_pollTimer);
-  document.getElementById('device-modal').style.display='none';
-}
+function cancelLogin(){clearInterval(_poll);document.getElementById('device-modal').style.display='none';}
 
 async function onLogin(token){
-  ghToken = token;
-  localStorage.setItem('gh_token', token);
-  const r = await fetch('https://api.github.com/user',{
-    headers:{Authorization:`token ${token}`}
-  });
-  ghUser = await r.json();
-  localStorage.setItem('gh_user', JSON.stringify(ghUser));
-  await ensureKeys();
-  // Default address: username.gitmine (if not already set)
-  if(!myAddr) {
-    myAddr = `${ghUser.login}.gitmine`;
-    localStorage.setItem('my_addr', myAddr);
-  }
+  ghToken=token;localStorage.setItem('gh_token',token);
+  const r=await fetch('https://api.github.com/user',{headers:{Authorization:`token ${token}`}});
+  ghUser=await r.json();localStorage.setItem('gh_user',JSON.stringify(ghUser));
+  if(!myAddr){myAddr=`${ghUser.login}.gitmine`;localStorage.setItem('my_addr',myAddr);}
   showApp();
 }
+function logout(){if(!confirm('Sign out?'))return;localStorage.removeItem('gh_token');localStorage.removeItem('gh_user');location.reload();}
 
-function logout(){
-  if(!confirm('Sign out? Your keys stay in localStorage.')) return;
-  localStorage.removeItem('gh_token');
-  localStorage.removeItem('gh_user');
-  location.reload();
-}
-
-// ── App ───────────────────────────────────────────────────────────────────
+// ─ app
 function showApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='block';
-
-  // Nav
-  document.getElementById('nav-right').innerHTML=`
-    <img src="${ghUser.avatar_url}" alt="">
-    <span>${ghUser.login}</span>
-    <button class="btn btn-sm" onclick="logout()">Sign out</button>
-  `;
-
-  const defAddr = `${ghUser.login}.gitmine`;
-  document.getElementById('default-addr-hint').textContent = defAddr;
-  document.getElementById('addr-display').textContent = myAddr || defAddr;
-  document.getElementById('addr-input').value = myAddr || defAddr;
-
-  selectCoin(myCoin, false);
-  updateMyStats(null);
-  updateConfigPreview();
+  document.getElementById('nav-right').innerHTML=`<img src="${ghUser.avatar_url}" alt=""><span>${ghUser.login}</span><button class="btn btn-sm" onclick="logout()">Sign out</button>`;
+  document.getElementById('prefix-label').textContent=ghUser.login;
+  renderAddr();
+  selectCoin(myCoin,false);
+  setSoft(mySoft,false);
   refresh();
-  setInterval(refresh, 30000);
+  setInterval(refresh,30000);
 }
 
-// ── Address edit ──────────────────────────────────────────────────────────
-function toggleAddressEdit(){
-  const disp = document.getElementById('addr-display');
-  const edit = document.getElementById('addr-edit');
-  const btn  = document.getElementById('edit-btn');
-  if(edit.style.display==='none'||!edit.style.display){
-    edit.style.display='block';
-    disp.style.display='none';
-    btn.textContent='Save';
-    document.getElementById('addr-input').focus();
-  } else {
-    const val = document.getElementById('addr-input').value.trim();
-    if(val){
-      myAddr = val;
-      localStorage.setItem('my_addr', myAddr);
-      disp.textContent = myAddr;
-      updateConfigPreview();
-      registerRig();
-    }
-    edit.style.display='none';
-    disp.style.display='block';
-    btn.textContent='Edit';
+// ─ address
+function renderAddr(){
+  document.getElementById('addr-display').textContent=myAddr;
+  document.getElementById('my-addr').textContent=myAddr;
+  document.getElementById('pool-url-display').textContent=STRATUM;
+  buildCmd();
+}
+function editAddr(){
+  const suf=myAddr.split('.').slice(1).join('.')||'gitmine';
+  document.getElementById('suffix-input').value=suf;
+  document.getElementById('suffix-edit').style.display='flex';
+}
+function saveAddr(){
+  const suf=document.getElementById('suffix-input').value.trim().replace(/[^a-zA-Z0-9_-]/g,'') || 'gitmine';
+  myAddr=`${ghUser.login}.${suf}`;
+  localStorage.setItem('my_addr',myAddr);
+  document.getElementById('suffix-edit').style.display='none';
+  renderAddr();
+}
+function cancelAddr(){document.getElementById('suffix-edit').style.display='none';}
+
+// ─ coin
+function selectCoin(c,save=true){
+  myCoin=c;if(save)localStorage.setItem('my_coin',c);
+  document.getElementById('ctab-fnnc').className='ctab'+(c==='FNNC'?' on-fnnc':'');
+  document.getElementById('ctab-tty').className ='ctab'+(c==='TTY' ?' on-tty' :'');
+  document.getElementById('my-coin').innerHTML=`<span class="tag tag-${c.toLowerCase()}">${c}</span>`;
+  // XMRig only for FNNC (yescryptr16), hide for TTY
+  document.getElementById('sft-xmrig').style.display=c==='FNNC'?'':'none';
+  if(c==='TTY'&&mySoft==='xmrig'){setSoft('cgminer',true);}
+  buildCmd();
+}
+
+// ─ software
+function setSoft(s,save=true){
+  mySoft=s;if(save)localStorage.setItem('my_soft',s);
+  ['cgminer','sgminer','xmrig','bfgminer'].forEach(x=>{
+    document.getElementById('sft-'+x).className='sft'+(s===x?' active':'');
+  });
+  buildCmd();
+}
+
+// ─ build command strings
+function buildCmd(){
+  const addr=myAddr||'username.gitmine';
+  const algo=myCoin==='FNNC'?'yescryptr16':'sha256d';
+  const pass='x';
+  let cmd='', cfg='';
+
+  if(mySoft==='cgminer'){
+    cmd=`cgminer --url ${STRATUM} \\
+  --user ${addr} --pass ${pass} \\
+  --algorithm ${algo}`;
+    cfg=`"pools" : [{
+  "url"  : "${STRATUM}",
+  "user" : "${addr}",
+  "pass" : "${pass}"
+}]`;
+  } else if(mySoft==='sgminer'){
+    cmd=`sgminer --url ${STRATUM} \\
+  --user ${addr} --pass ${pass} \\
+  --algorithm ${algo}`;
+    cfg=`"pools" : [{
+  "url"  : "${STRATUM}",
+  "user" : "${addr}",
+  "pass" : "${pass}"
+}]`;
+  } else if(mySoft==='bfgminer'){
+    cmd=`bfgminer --url ${STRATUM} \\
+  --user ${addr} --pass ${pass}`;
+    cfg=`"pools" : [{
+  "url"  : "${STRATUM}",
+  "user" : "${addr}",
+  "pass" : "${pass}"
+}]`;
+  } else if(mySoft==='xmrig'){
+    cmd=`xmrig --url ${STRATUM.replace('stratum+tcp://','').replace(':3333',':3334')} \\
+  --user ${addr} --pass ${pass} \\
+  --algo yescryptr16`;
+    cfg=`"pools": [{
+  "url"  : "${STRATUM.replace('stratum+tcp://','').replace(':3333',':3334')}",
+  "user" : "${addr}",
+  "pass" : "${pass}",
+  "algo" : "yescryptr16"
+}]`;
   }
+
+  document.getElementById('cmd-out').textContent=cmd;
+  document.getElementById('cfg-out').textContent=cfg;
 }
 
-// ── Coin selector ─────────────────────────────────────────────────────────
-function selectCoin(coin, save=true){
-  myCoin = coin;
-  if(save) localStorage.setItem('my_coin', coin);
-  document.getElementById('btn-fnnc').className = 'coin-btn'+(coin==='FNNC'?' active-fnnc':'');
-  document.getElementById('btn-tty').className  = 'coin-btn'+(coin==='TTY' ?' active-tty' :'');
-  document.getElementById('my-coin').innerHTML =
-    `<span class="tag tag-${coin.toLowerCase()}">${coin}</span>`;
-  updateConfigPreview();
-}
+function copyCmd(){cp(document.getElementById('cmd-out').textContent);}
+function copyCfg(){cp(document.getElementById('cfg-out').textContent);}
 
-// ── Mining toggle ─────────────────────────────────────────────────────────
-async function toggleMining(){
-  if(!mining){
-    // Register rig silently first
-    await registerRig();
-    mining = true;
-    document.getElementById('mine-btn').textContent='⏹ Stop Mining';
-    document.getElementById('mine-btn').className='btn btn-danger btn-lg';
-    document.getElementById('mine-status').innerHTML=
-      '<span class="spinner"></span> Mining '+myCoin+'&hellip;';
-    toast('Mining started! Run git-mine.py or use the config below to connect your rig.');
-  } else {
-    mining = false;
-    document.getElementById('mine-btn').innerHTML='&#9654; Start Mining';
-    document.getElementById('mine-btn').className='btn btn-green btn-lg';
-    document.getElementById('mine-status').textContent='';
-  }
-}
-
-// ── Rig registration (silent) ─────────────────────────────────────────────
-async function registerRig(){
-  if(!ghToken||!ghUser||!myKeys) return;
-  const rigId = (myAddr||ghUser.login+'.gitmine').replace(/[^a-zA-Z0-9._-]/g,'-');
-  const threads = parseInt(document.getElementById('f-threads').value)||1;
-  const yaml = [
-    `# GitMine Rig — auto-registered`,
-    `rig:`,
-    `  id: "${rigId}"`,
-    `  owner: "${ghUser.login}"`,
-    ``,
-    `mining:`,
-    `  coin: "${myCoin}"`,
-    `  address: "${myAddr}"`,
-    `  threads: ${threads}`,
-    ``,
-    `identity:`,
-    `  pubkey: "${myKeys.publicKey}"`,
-    `  github: "${ghUser.login}"`,
-  ].join('\n');
-
-  try {
-    const path = `fleet/${rigId}/config.yaml`;
-    let sha = null;
-    const chk = await fetch(
-      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`,
-      {headers:{Authorization:`token ${ghToken}`}}
-    );
-    if(chk.ok){ const f=await chk.json(); sha=f.sha; }
-
-    await fetch(
-      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`,
-      {
-        method:'PUT',
-        headers:{Authorization:`token ${ghToken}`,'Content-Type':'application/json'},
-        body: JSON.stringify({
-          message:`fleet: register ${rigId}`,
-          content: btoa(unescape(encodeURIComponent(yaml))),
-          ...(sha?{sha}:{})
-        })
-      }
-    );
-  } catch(e){ console.warn('rig register:', e); }
-}
-
-// ── Config preview / download ─────────────────────────────────────────────
-function updateConfigPreview(){
-  if(!myKeys) return;
-  const cfg = {
-    pool:        POOL_URL,
-    repo:        `${REPO_OWNER}/${REPO_NAME}`,
-    rig_id:      (myAddr||'').replace(/[^a-zA-Z0-9._-]/g,'-'),
-    coin:        myCoin,
-    address:     myAddr,
-    threads:     parseInt(document.getElementById('f-threads')?.value)||1,
-    private_key: myKeys.privateKey,
-    public_key:  myKeys.publicKey,
-    github:      ghUser?.login,
-  };
-  document.getElementById('config-preview').textContent = JSON.stringify(cfg,null,2);
-}
-function downloadConfig(){
-  updateConfigPreview();
-  const a=document.createElement('a');
-  a.href='data:application/json,'+encodeURIComponent(document.getElementById('config-preview').textContent);
-  a.download='gitmine.json'; a.click();
-}
-function copyConfig(){
-  navigator.clipboard.writeText(document.getElementById('config-preview').textContent)
-    .then(()=>toast('Copied!'));
-}
-
-// ── Pool data ─────────────────────────────────────────────────────────────
+// ─ pool data
 async function refresh(){
-  try {
-    const [tr, sr] = await Promise.all([
-      fetch('template.json?_='+Date.now()),
-      fetch('stats.json?_='+Date.now())
-    ]);
+  try{
+    const[tr,sr]=await Promise.all([fetch('template.json?_='+Date.now()),fetch('stats.json?_='+Date.now())]);
     if(tr.ok){
       const t=await tr.json();
-      const c=(t.coin||'').toLowerCase();
-      document.getElementById('t-coin').innerHTML=`<span class="tag tag-${c}">${t.coin||'?'}</span>`;
+      document.getElementById('t-coin').innerHTML=`<span class="tag tag-${(t.coin||'').toLowerCase()}">${t.coin||'?'}</span>`;
       document.getElementById('t-detail').textContent=`${t.algo||''} | height ${t.height||'?'}`;
     }
     if(sr.ok){
@@ -595,57 +476,40 @@ async function refresh(){
       document.getElementById('s-total').textContent=s.total_shares??'0';
       document.getElementById('hr-fnnc').textContent=fmtH(s.coins?.fnnc?.hashrate);
       document.getElementById('hr-tty').textContent =fmtH(s.coins?.tty?.hashrate);
-      updateMyStats(s);
-      renderMiners(s);
+      updateMyStats(s);renderMiners(s);
       document.getElementById('last-update').textContent='Updated '+new Date().toLocaleTimeString();
     }
-  } catch(e){}
+  }catch(e){}
 }
-
 function updateMyStats(s){
-  if(!myAddr) return;
-  document.getElementById('my-addr').textContent=myAddr;
-  if(!s) return;
+  if(!myAddr)return;
   const m=Object.values(s.miners||{}).find(x=>x.address===myAddr);
-  if(!m) return;
-  const now=Math.floor(Date.now()/1000);
-  const alive=m.last_share_at&&(now-m.last_share_at)<300;
+  if(!m)return;
+  const now=Math.floor(Date.now()/1000),alive=m.last_share_at&&(now-m.last_share_at)<300;
   document.getElementById('my-shares').textContent=m.shares||0;
   document.getElementById('my-fnnc').textContent=m.coin_shares?.fnnc||0;
   document.getElementById('my-tty').textContent =m.coin_shares?.tty ||0;
   document.getElementById('my-bal').textContent =(m.balance||0).toFixed(8);
   document.getElementById('my-last').textContent=ago(m.last_share_at);
-  document.getElementById('my-status').innerHTML=
-    `<span class="dot ${alive?'dot-green':'dot-red'}"></span>${alive?'Active':'Idle'}`;
+  document.getElementById('my-status').innerHTML=`<span class="dot ${alive?'dot-on':'dot-off'}"></span>${alive?'Active':'Waiting'}`;
 }
-
 function renderMiners(s){
   const miners=Object.values(s.miners||{});
   const tbody=document.getElementById('miner-table');
-  if(!miners.length){
-    tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted)">No miners yet</td></tr>';
-    return;
-  }
+  if(!miners.length){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted)">No miners yet</td></tr>';return;}
   miners.sort((a,b)=>b.shares-a.shares);
   const now=Math.floor(Date.now()/1000);
   tbody.innerHTML=miners.map(m=>{
     const alive=m.last_share_at&&(now-m.last_share_at)<300;
     const addr=m.address||'?';
-    const short=addr.length>20?addr.slice(0,10)+'…'+addr.slice(-6):addr;
+    const short=addr.length>22?addr.slice(0,11)+'…'+addr.slice(-6):addr;
     const cs=m.coin_shares||{};
-    return`<tr>
-      <td title="${addr}">${short}</td>
-      <td>${m.shares||0}</td>
-      <td>${cs.fnnc||0}</td><td>${cs.tty||0}</td>
-      <td>${(m.balance||0).toFixed(4)}</td>
-      <td>${ago(m.last_share_at)}</td>
-      <td><span class="dot ${alive?'dot-green':'dot-red'}"></span>${alive?'Active':'Idle'}</td>
-    </tr>`;
+    return`<tr><td title="${addr}">${short}</td><td>${m.shares||0}</td><td>${cs.fnnc||0}</td><td>${cs.tty||0}</td><td>${(m.balance||0).toFixed(4)}</td><td>${ago(m.last_share_at)}</td><td><span class="dot ${alive?'dot-on':'dot-off'}"></span>${alive?'Active':'Idle'}</td></tr>`;
   }).join('');
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────
-if(ghToken && ghUser){ ensureKeys().then(showApp); }
+// ─ boot
+if(ghToken&&ghUser){showApp();}  
 </script>
 </body>
 </html>
