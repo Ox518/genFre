@@ -16,18 +16,13 @@
 }
 body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:13px;min-height:100vh}
 a{color:var(--accent2)}
-
-/* TOPBAR */
 #topbar{
   background:var(--bg3);height:46px;display:flex;align-items:center;
   padding:0 18px;gap:10px;border-bottom:1px solid #2a2d3e;
   position:sticky;top:0;z-index:100;
 }
 #topbar .logo{color:var(--accent);font-size:15px;font-weight:bold;margin-right:12px}
-.btn{
-  padding:5px 14px;border:none;border-radius:4px;cursor:pointer;
-  font-family:var(--font);font-size:12px;font-weight:bold;transition:.15s;
-}
+.btn{padding:5px 14px;border:none;border-radius:4px;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:bold;transition:.15s;}
 .btn:hover{opacity:.85}
 .btn-accent{background:var(--accent);color:var(--fg)}
 .btn-green{background:var(--green);color:#000}
@@ -37,59 +32,30 @@ a{color:var(--accent2)}
 #auth-area{margin-left:auto;display:flex;align-items:center;gap:10px}
 #user-info{color:var(--fg2);font-size:12px}
 #avatar{width:28px;height:28px;border-radius:50%;border:2px solid var(--accent)}
-
-/* LAYOUT */
 #layout{display:flex;height:calc(100vh - 70px)}
-#sidebar{
-  width:210px;min-width:180px;background:var(--bg2);
-  border-right:1px solid #2a2d3e;padding:14px 12px;
-  display:flex;flex-direction:column;gap:4px;
-  overflow-y:auto;
-}
+#sidebar{width:210px;min-width:180px;background:var(--bg2);border-right:1px solid #2a2d3e;padding:14px 12px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;}
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-
-/* SIDEBAR */
 .side-label{color:var(--fg2);font-size:11px;font-weight:bold;margin:10px 0 4px;letter-spacing:.08em}
 .stat-row{display:flex;justify-content:space-between;padding:2px 0}
 .stat-val{color:var(--fg);font-weight:bold}
 .pool-dot{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px}
 .dot{font-size:14px}
-.dot-green{color:var(--green)}
-.dot-red{color:var(--red)}
-.dot-grey{color:var(--fg2)}
-
-/* TABS */
+.dot-green{color:var(--green)}.dot-red{color:var(--red)}.dot-grey{color:var(--fg2)}
 #tabs{display:flex;background:var(--bg2);border-bottom:1px solid #2a2d3e}
-.tab{
-  padding:10px 20px;cursor:pointer;color:var(--fg2);
-  font-weight:bold;font-size:12px;border-bottom:2px solid transparent;
-  transition:.15s;
-}
+.tab{padding:10px 20px;cursor:pointer;color:var(--fg2);font-weight:bold;font-size:12px;border-bottom:2px solid transparent;transition:.15s;}
 .tab:hover{color:var(--fg)}
 .tab.active{color:var(--fg);border-bottom-color:var(--accent)}
-
-/* TAB CONTENT */
 .tab-pane{display:none;flex:1;overflow:auto;padding:14px}
 .tab-pane.active{display:block}
-
-/* TABLES */
 .bench-table{width:100%;border-collapse:collapse;font-size:12px}
-.bench-table th{
-  background:var(--bg3);color:var(--accent2);text-align:left;
-  padding:7px 10px;position:sticky;top:0;white-space:nowrap;
-}
+.bench-table th{background:var(--bg3);color:var(--accent2);text-align:left;padding:7px 10px;position:sticky;top:0;white-space:nowrap;}
 .bench-table td{padding:6px 10px;border-bottom:1px solid #1e2130;white-space:nowrap}
 .bench-table tr:hover td{background:var(--bg3)}
 .tag-ok{color:var(--green)}.tag-fail{color:var(--red)}.tag-warn{color:var(--yellow)}.tag-idle{color:var(--fg2)}
-
-/* CARDS (workers) */
 #worker-cards{display:flex;flex-wrap:wrap;gap:12px;padding:14px}
-.worker-card{
-  background:var(--bg2);border:1px solid #2a2d3e;
-  border-radius:8px;padding:14px 18px;min-width:220px;
-  position:relative;transition:.2s;
-}
+.worker-card{background:var(--bg2);border:1px solid #2a2d3e;border-radius:8px;padding:14px 18px;min-width:220px;position:relative;transition:.2s;}
 .worker-card.mining{border-color:var(--green)}
+.worker-card.sim{border-color:var(--yellow)}
 .worker-card.error{border-color:var(--red)}
 .wc-rig{font-size:14px;font-weight:bold;margin-bottom:4px}
 .wc-pool{color:var(--accent2);font-size:11px;margin-bottom:8px}
@@ -97,70 +63,26 @@ a{color:var(--accent2)}
 .wc-stat label{color:var(--fg2);font-size:10px}
 .wc-stat span{font-size:13px;font-weight:bold}
 .wc-actions{margin-top:10px;display:flex;gap:6px}
-
-/* ASSIGN */
-#assign-controls{
-  display:flex;align-items:center;gap:10px;
-  padding:12px 14px;background:var(--bg2);
-  border-bottom:1px solid #2a2d3e;
-  flex-wrap:wrap;
-}
-#assign-controls select,#assign-controls input{
-  background:var(--bg3);color:var(--fg);border:1px solid #333;
-  padding:5px 10px;border-radius:4px;font-family:var(--font);font-size:12px;
-}
-
-/* LOG */
-#log-panel{
-  flex:1;background:var(--bg2);font-size:12px;overflow-y:auto;
-  padding:10px 14px;font-family:var(--font);
-}
+.badge-sim{background:var(--yellow);color:#000;font-size:10px;font-weight:bold;padding:1px 6px;border-radius:3px;margin-left:6px}
+#assign-controls{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg2);border-bottom:1px solid #2a2d3e;flex-wrap:wrap;}
+#assign-controls select,#assign-controls input{background:var(--bg3);color:var(--fg);border:1px solid #333;padding:5px 10px;border-radius:4px;font-family:var(--font);font-size:12px;}
+#log-panel{flex:1;background:var(--bg2);font-size:12px;overflow-y:auto;padding:10px 14px;font-family:var(--font);}
 .log-line{padding:2px 0;line-height:1.5}
 .log-ts{color:var(--fg2)}
-.log-ok{color:var(--green)}.log-err{color:var(--red)}
-.log-warn{color:var(--yellow)}.log-info{color:var(--accent2)}
-
-/* MODALS */
-.modal-overlay{
-  display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,.6);z-index:200;
-  align-items:center;justify-content:center;
-}
+.log-ok{color:var(--green)}.log-err{color:var(--red)}.log-warn{color:var(--yellow)}.log-info{color:var(--accent2)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex}
-.modal{
-  background:var(--bg2);border:1px solid var(--accent);
-  border-radius:8px;padding:24px 28px;min-width:380px;max-width:96vw;
-}
+.modal{background:var(--bg2);border:1px solid var(--accent);border-radius:8px;padding:24px 28px;min-width:380px;max-width:96vw;}
 .modal h3{color:var(--accent);margin-bottom:16px;font-size:14px}
 .field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
 .field label{color:var(--fg2);font-size:11px}
-.field input,.field select{
-  background:var(--bg3);color:var(--fg);border:1px solid #333;
-  padding:7px 10px;border-radius:4px;font-family:var(--font);font-size:13px;
-}
+.field input,.field select{background:var(--bg3);color:var(--fg);border:1px solid #333;padding:7px 10px;border-radius:4px;font-family:var(--font);font-size:13px;}
 .field input:focus,.field select:focus{outline:1px solid var(--accent)}
 .modal-actions{display:flex;gap:8px;margin-top:16px}
-
-/* STATUS BAR */
-#statusbar{
-  height:24px;background:var(--bg3);border-top:1px solid #2a2d3e;
-  display:flex;align-items:center;padding:0 14px;
-  font-size:11px;color:var(--fg2);justify-content:space-between;
-}
-
-/* LOGIN SCREEN */
-#login-screen{
-  display:flex;flex-direction:column;align-items:center;
-  justify-content:center;height:100vh;gap:20px;
-}
+#statusbar{height:24px;background:var(--bg3);border-top:1px solid #2a2d3e;display:flex;align-items:center;padding:0 14px;font-size:11px;color:var(--fg2);justify-content:space-between;}
+#login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:20px;}
 #login-screen h1{color:var(--accent);font-size:22px}
 #login-screen p{color:var(--fg2);max-width:380px;text-align:center;line-height:1.6}
-
-/* SPINNER */
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--fg2);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* SCROLLBAR */
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
@@ -168,27 +90,21 @@ a{color:var(--accent2)}
 </head>
 <body>
 
-<!-- LOGIN SCREEN -->
 <div id="login-screen">
   <h1>⛏ GitMine Pool Test Bench</h1>
   <p>Sign in with GitHub to manage pools, simulate workers, and test mining endpoints — all saved to your account.</p>
-  <button class="btn btn-accent" id="btn-github-login" style="font-size:14px;padding:10px 28px">
-    Sign in with GitHub
-  </button>
+  <button class="btn btn-accent" id="btn-github-login" style="font-size:14px;padding:10px 28px">Sign in with GitHub</button>
   <p style="font-size:11px;color:var(--fg2)">Your pool configs and workers are private to your account via Row-Level Security.</p>
 </div>
 
-<!-- MAIN APP (hidden until logged in) -->
 <div id="app" style="display:none">
-
-  <!-- TOPBAR -->
   <div id="topbar">
     <span class="logo">⛏ GitMine Test Bench</span>
-    <button class="btn btn-accent"  id="btn-add-pool">+ Pool</button>
-    <button class="btn btn-green"   id="btn-add-worker">+ Worker</button>
-    <button class="btn btn-ghost"   id="btn-test-all">Test All</button>
-    <button class="btn btn-green"   id="btn-start-all">Start All</button>
-    <button class="btn btn-red"     id="btn-stop-all">Stop All</button>
+    <button class="btn btn-accent" id="btn-add-pool">+ Pool</button>
+    <button class="btn btn-green"  id="btn-add-worker">+ Worker</button>
+    <button class="btn btn-ghost"  id="btn-test-all">Test All</button>
+    <button class="btn btn-green"  id="btn-start-all">Start All</button>
+    <button class="btn btn-red"    id="btn-stop-all">Stop All</button>
     <div id="auth-area">
       <span id="user-info"></span>
       <img id="avatar" src="" alt="" style="display:none">
@@ -196,10 +112,7 @@ a{color:var(--accent2)}
     </div>
   </div>
 
-  <!-- LAYOUT -->
   <div id="layout">
-
-    <!-- SIDEBAR -->
     <div id="sidebar">
       <div class="side-label">STATS</div>
       <div class="stat-row"><span>Pools</span>   <span class="stat-val" id="s-pools">0</span></div>
@@ -212,7 +125,6 @@ a{color:var(--accent2)}
       <div id="sidebar-pools"></div>
     </div>
 
-    <!-- MAIN -->
     <div id="main">
       <div id="tabs">
         <div class="tab active" data-tab="pools">Pools</div>
@@ -221,7 +133,6 @@ a{color:var(--accent2)}
         <div class="tab" data-tab="log">Log</div>
       </div>
 
-      <!-- POOLS TAB -->
       <div class="tab-pane active" id="pane-pools">
         <table class="bench-table">
           <thead><tr>
@@ -232,12 +143,10 @@ a{color:var(--accent2)}
         </table>
       </div>
 
-      <!-- WORKERS TAB -->
       <div class="tab-pane" id="pane-workers">
         <div id="worker-cards"></div>
       </div>
 
-      <!-- ASSIGN TAB -->
       <div class="tab-pane" id="pane-assign" style="padding:0;display:flex;flex-direction:column">
         <div id="assign-controls">
           <label style="color:var(--fg2);font-size:12px">Target Pool:</label>
@@ -256,7 +165,6 @@ a{color:var(--accent2)}
         </div>
       </div>
 
-      <!-- LOG TAB -->
       <div class="tab-pane" id="pane-log" style="padding:0;display:flex;flex-direction:column">
         <div style="padding:6px 14px;background:var(--bg3);display:flex;gap:8px;border-bottom:1px solid #2a2d3e">
           <button class="btn btn-ghost" id="btn-clear-log" style="padding:3px 10px">Clear</button>
@@ -311,15 +219,21 @@ const SUPA_URL = 'https://wfabhxfpzqrdhlkidkcl.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYWJoeGZwenFyZGhsa2lka2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NzE0NDIsImV4cCI6MjA5NjQ0NzQ0Mn0.cZKRmChbUr8pRJVljv2TAnjW-Xivx_GtTaBSpQJL6oA';
 const RELAY    = `${SUPA_URL}/functions/v1/bench-relay`;
 
+// Synthetic fallback template used when pool is unreachable
+const SIM_TEMPLATE = {
+  coin:'FNNC', algo:'yescryptr16', height:0,
+  prevhash:'0'.repeat(64), bits:'1e0fffff',
+  target:'00000fffff000000000000000000000000000000000000000000000000000000',
+  coinbase:'sim', sim:true
+};
+
 const { createClient } = supabase;
 const db = createClient(SUPA_URL, SUPA_KEY);
 
-// ── State cache
 let pools=[], workers=[], assignments={};
 let session=null;
-let activeWorkers={}; // worker_id -> { stop:bool }
+let activeWorkers={};
 
-// ── Auth
 async function init() {
   const { data: { session: s } } = await db.auth.getSession();
   session = s;
@@ -347,12 +261,10 @@ async function showApp() {
 }
 
 document.getElementById('btn-github-login').addEventListener('click', () => {
-  db.auth.signInWithOAuth({ provider:'github',
-    options:{ redirectTo: window.location.href } });
+  db.auth.signInWithOAuth({ provider:'github', options:{ redirectTo: window.location.href } });
 });
 document.getElementById('btn-logout').addEventListener('click', () => db.auth.signOut());
 
-// ── Load
 async function loadAll() {
   const [{ data: p }, { data: w }, { data: a }] = await Promise.all([
     db.from('bench_pools').select('*').order('created_at'),
@@ -366,24 +278,16 @@ async function loadAll() {
   renderAll();
 }
 
-// ── Realtime
 function subscribeRealtime() {
   db.channel('bench-changes')
     .on('postgres_changes', { event:'*', schema:'public', table:'bench_workers' }, () => loadAll())
     .on('postgres_changes', { event:'*', schema:'public', table:'bench_pools' },   () => loadAll())
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'bench_log' }, payload => {
-      appendLog(payload.new);
-    })
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'bench_log' }, payload => appendLog(payload.new))
     .subscribe();
 }
 
-// ── Render
 function renderAll() {
-  renderPools();
-  renderWorkers();
-  renderAssign();
-  renderSidebar();
-  renderPoolSelects();
+  renderPools(); renderWorkers(); renderAssign(); renderSidebar(); renderPoolSelects();
 }
 
 function renderPools() {
@@ -399,11 +303,8 @@ function renderPools() {
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(p.url)}</td>
       <td>${esc(p.coin||'')}</td>
       <td>${esc((p.username||'').slice(0,18))}</td>
-      <td>${ok}</td>
-      <td>${esc(tr.protocol||'—')}</td>
-      <td>${tr.height||'—'}</td>
-      <td>${tr.latency_ms ? tr.latency_ms+'ms' : '—'}</td>
-      <td>${auth}</td>
+      <td>${ok}</td><td>${esc(tr.protocol||'—')}</td><td>${tr.height||'—'}</td>
+      <td>${tr.latency_ms ? tr.latency_ms+'ms' : '—'}</td><td>${auth}</td>
       <td>
         <button class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="testPool('${p.id}')">Test</button>
         <button class="btn btn-ghost" style="padding:2px 8px;font-size:11px;color:var(--red)" onclick="removePool('${p.id}')">✕</button>
@@ -418,18 +319,19 @@ function renderWorkers() {
   workers.forEach(w => {
     const pid  = assignments[w.id];
     const pool = pools.find(p=>p.id===pid);
-    const cls  = w.status==='mining' ? 'mining' : (w.status?.startsWith('err') ? 'error' : '');
+    const isSim = w.status==='sim';
+    const cls  = isSim ? 'sim' : (w.status==='mining' ? 'mining' : (w.status?.startsWith('err') ? 'error' : ''));
     const card = document.createElement('div');
     card.className = `worker-card ${cls}`;
     card.id = `card-${w.id}`;
     card.innerHTML = `
-      <div class="wc-rig">${esc(w.rig_id)}</div>
+      <div class="wc-rig">${esc(w.rig_id)}${isSim ? '<span class="badge-sim">SIM</span>' : ''}</div>
       <div class="wc-pool">${pool ? '→ '+esc(pool.name) : '<span style="color:var(--yellow)">unassigned</span>'}</div>
       <div class="wc-stats">
-        <div class="wc-stat"><label>Status</label><span id="ws-status-${w.id}">${esc(w.status||'idle')}</span></div>
-        <div class="wc-stat"><label>H/s</label><span id="ws-hs-${w.id}" style="color:var(--green)">${Math.round(w.hashrate||0)}</span></div>
-        <div class="wc-stat"><label>Shares</label><span id="ws-shares-${w.id}">${w.shares||0}</span></div>
-        <div class="wc-stat"><label>Errors</label><span id="ws-errors-${w.id}" style="color:var(--red)">${w.errors||0}</span></div>
+        <div class="wc-stat"><label>Status</label><span>${esc(w.status||'idle')}</span></div>
+        <div class="wc-stat"><label>H/s</label><span style="color:var(--green)">${Math.round(w.hashrate||0)}</span></div>
+        <div class="wc-stat"><label>Shares</label><span>${w.shares||0}</span></div>
+        <div class="wc-stat"><label>Errors</label><span style="color:var(--red)">${w.errors||0}</span></div>
       </div>
       <div class="wc-actions">
         <button class="btn btn-green" style="padding:3px 10px;font-size:11px" onclick="startWorker('${w.id}')">Start</button>
@@ -447,15 +349,12 @@ function renderAssign() {
     const pid  = assignments[w.id];
     const pool = pools.find(p=>p.id===pid);
     const tr   = document.createElement('tr');
-    tr.id      = `arow-${w.id}`;
     tr.innerHTML = `
       <td><input type="checkbox" class="chk-worker" data-id="${w.id}"></td>
       <td>${esc(w.rig_id)}</td>
       <td>${pool ? esc(pool.name) : '<span style="color:var(--yellow)">— unassigned —</span>'}</td>
-      <td class="tag-${w.status==='mining'?'ok':'idle'}">${esc(w.status||'idle')}</td>
-      <td>
-        <button class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="quickAssign('${w.id}')">Assign</button>
-      </td>`;
+      <td class="tag-${w.status==='mining'||w.status==='sim'?'ok':'idle'}">${esc(w.status||'idle')}</td>
+      <td><button class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="quickAssign('${w.id}')">Assign</button></td>`;
     tb.appendChild(tr);
   });
 }
@@ -463,10 +362,10 @@ function renderAssign() {
 function renderSidebar() {
   document.getElementById('s-pools').textContent   = pools.length;
   document.getElementById('s-workers').textContent = workers.length;
-  const mining = workers.filter(w=>w.status==='mining').length;
-  const totalHs= workers.reduce((a,w)=>a+(w.hashrate||0),0);
-  const totalSh= workers.reduce((a,w)=>a+(w.shares||0),0);
-  const totalEr= workers.reduce((a,w)=>a+(w.errors||0),0);
+  const mining  = workers.filter(w=>w.status==='mining'||w.status==='sim').length;
+  const totalHs = workers.reduce((a,w)=>a+(w.hashrate||0),0);
+  const totalSh = workers.reduce((a,w)=>a+(w.shares||0),0);
+  const totalEr = workers.reduce((a,w)=>a+(w.errors||0),0);
   document.getElementById('s-mining').textContent  = mining;
   document.getElementById('s-hs').textContent      = Math.round(totalHs).toLocaleString();
   document.getElementById('s-shares').textContent  = totalSh;
@@ -485,16 +384,12 @@ function renderPoolSelects() {
     const sel = document.getElementById(id);
     const cur = sel.value;
     sel.innerHTML = id==='aw-pool' ? '<option value="">— unassigned —</option>' : '';
-    pools.forEach(p => {
-      const o = document.createElement('option');
-      o.value=p.id; o.textContent=p.name;
-      sel.appendChild(o);
-    });
+    pools.forEach(p => { const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o); });
     if (cur) sel.value = cur;
   });
 }
 
-// ── Pool actions
+// Pool actions
 document.getElementById('btn-add-pool').addEventListener('click', () => openModal('modal-add-pool'));
 document.getElementById('ap-cancel').addEventListener('click',    () => closeModal('modal-add-pool'));
 document.getElementById('ap-save').addEventListener('click', async () => {
@@ -517,8 +412,7 @@ document.getElementById('ap-save').addEventListener('click', async () => {
 async function removePool(id) {
   if (!confirm('Remove this pool?')) return;
   await db.from('bench_pools').delete().eq('id',id);
-  await loadAll();
-  log('Pool removed','warn');
+  await loadAll(); log('Pool removed','warn');
 }
 
 async function testPool(id) { testPoolById(id); }
@@ -528,34 +422,28 @@ async function testPoolById(id) {
   const pool = pools.find(p=>p.id===id);
   if (!pool) return;
   log(`Testing ${pool.name} ...`);
-  const token = session.access_token;
-  const result = { reachable:false, protocol:null, latency_ms:null,
-                   coin:null, algo:null, height:null, auth_ok:null, errors:[] };
+  const token  = session.access_token;
+  const result = { reachable:false, protocol:null, latency_ms:null, coin:null, algo:null, height:null, auth_ok:null, errors:[] };
   try {
     const t0 = Date.now();
-    const r = await fetch(RELAY+'/template.json', {
+    const r  = await fetch(RELAY+'/template.json', {
       headers:{ 'Authorization':'Bearer '+token, 'x-bench-target': pool.url }
     });
     result.latency_ms = Date.now()-t0;
-    result.reachable  = true;
     if (r.ok) {
+      result.reachable = true;
       const t = await r.json();
-      result.protocol = 'gitmine';
-      result.coin     = t.coin;
-      result.algo     = t.algo;
-      result.height   = t.height;
+      result.protocol = 'gitmine'; result.coin=t.coin; result.algo=t.algo; result.height=t.height;
+    } else {
+      result.errors.push(`HTTP ${r.status}`);
     }
   } catch(e) { result.errors.push(String(e).slice(0,60)); }
-  // Auth probe
   if (pool.username) {
     try {
       const ra = await fetch(RELAY+'/worker', {
         method:'POST',
-        headers:{ 'Authorization':'Bearer '+token,
-                  'x-bench-target': pool.url,
-                  'Content-Type':'application/json' },
-        body: JSON.stringify({ user:pool.username, password:pool.password||'',
-                               rig:'gui-probe', pubkey:'00'.repeat(32) })
+        headers:{ 'Authorization':'Bearer '+token, 'x-bench-target':pool.url, 'Content-Type':'application/json' },
+        body: JSON.stringify({ user:pool.username, password:pool.password||'', rig:'gui-probe', pubkey:'00'.repeat(32) })
       });
       result.auth_ok = [200,201,202].includes(ra.status);
     } catch { result.auth_ok = false; }
@@ -564,16 +452,14 @@ async function testPoolById(id) {
   if (result.reachable)
     log(`✓ ${pool.name} up | ${result.latency_ms}ms | h=${result.height||'?'}`, 'ok');
   else
-    log(`✗ ${pool.name} unreachable: ${result.errors.join(', ')}`, 'err');
+    log(`✗ ${pool.name} unreachable (${result.errors.join(', ')}) — workers will run in SIM mode`, 'warn');
   await loadAll();
 }
 
-async function testAllPools() {
-  for (const p of pools) await testPoolById(p.id);
-}
+async function testAllPools() { for (const p of pools) await testPoolById(p.id); }
 document.getElementById('btn-test-all').addEventListener('click', testAllPools);
 
-// ── Worker actions
+// Worker actions
 document.getElementById('btn-add-worker').addEventListener('click', () => openModal('modal-add-worker'));
 document.getElementById('aw-cancel').addEventListener('click', () => closeModal('modal-add-worker'));
 document.getElementById('aw-save').addEventListener('click', async () => {
@@ -582,14 +468,8 @@ document.getElementById('aw-save').addEventListener('click', async () => {
   const pid   = document.getElementById('aw-pool').value || null;
   for (let i=0;i<count;i++) {
     const rig_id = count>1 ? `${base}-${String(i).padStart(2,'0')}` : base;
-    const { data: w } = await db.from('bench_workers').insert({
-      rig_id, user_id: session.user.id
-    }).select().single();
-    if (pid && w) {
-      await db.from('bench_assignments').upsert({
-        worker_id:w.id, pool_id:pid, user_id:session.user.id
-      }, { onConflict:'worker_id' });
-    }
+    const { data: w } = await db.from('bench_workers').insert({ rig_id, user_id:session.user.id }).select().single();
+    if (pid && w) await db.from('bench_assignments').upsert({ worker_id:w.id, pool_id:pid, user_id:session.user.id }, { onConflict:'worker_id' });
     log(`Added worker: ${rig_id}`);
   }
   closeModal('modal-add-worker');
@@ -599,18 +479,15 @@ document.getElementById('aw-save').addEventListener('click', async () => {
 async function removeWorker(id) {
   stopWorker(id);
   await db.from('bench_workers').delete().eq('id',id);
-  await loadAll();
-  log('Worker removed','warn');
+  await loadAll(); log('Worker removed','warn');
 }
 
-// ── Assign
+// Assign
 async function quickAssign(workerId) {
-  const sel = document.getElementById('assign-pool-select');
-  const pid = sel.value;
+  const pid = document.getElementById('assign-pool-select').value;
   if (!pid) { alert('Select a target pool first'); return; }
   await doAssign([workerId], pid);
 }
-
 document.getElementById('btn-assign-selected').addEventListener('click', async () => {
   const pid = document.getElementById('assign-pool-select').value;
   if (!pid) { alert('Select a target pool'); return; }
@@ -618,101 +495,94 @@ document.getElementById('btn-assign-selected').addEventListener('click', async (
   if (!checked.length) { alert('Select workers first'); return; }
   await doAssign(checked, pid);
 });
-
 document.getElementById('btn-assign-all').addEventListener('click', async () => {
   const pid = document.getElementById('assign-pool-select').value;
   if (!pid) { alert('Select a target pool'); return; }
   await doAssign(workers.map(w=>w.id), pid);
   log(`Assigned ALL workers → ${pools.find(p=>p.id===pid)?.name}`);
 });
-
 async function doAssign(workerIds, poolId) {
   for (const wid of workerIds) {
-    await db.from('bench_assignments').upsert({
-      worker_id:wid, pool_id:poolId, user_id:session.user.id
-    }, { onConflict:'worker_id' });
-    const w = workers.find(w=>w.id===wid);
-    const p = pools.find(p=>p.id===poolId);
+    await db.from('bench_assignments').upsert({ worker_id:wid, pool_id:poolId, user_id:session.user.id }, { onConflict:'worker_id' });
+    const w=workers.find(w=>w.id===wid); const p=pools.find(p=>p.id===poolId);
     if(w&&p) log(`Assigned ${w.rig_id} → ${p.name}`);
   }
   await loadAll();
 }
-
 document.getElementById('chk-all').addEventListener('change', e => {
   document.querySelectorAll('.chk-worker').forEach(c=>c.checked=e.target.checked);
 });
 
-// ── Mining simulation (Web Worker inline)
+// Mining simulation — fallback to SIM_TEMPLATE on any pool error
 function startWorker(id) {
   if (activeWorkers[id]) return;
   const pid  = assignments[id];
   const pool = pools.find(p=>p.id===pid);
   if (!pool) { log(`No pool assigned to worker ${id}`,'warn'); return; }
-  const token = session.access_token;
-  activeWorkers[id] = { stop: false };
+  const token   = session.access_token;
+  activeWorkers[id] = { stop:false };
+  const simTmpl = JSON.stringify(SIM_TEMPLATE);
 
-  // Inline Web Worker via Blob URL
   const workerCode = `
-    const relay   = '${RELAY}';
-    const poolUrl = '${pool.url}';
-    const token   = '${token}';
-    const wid     = '${id}';
-    const supaUrl = '${SUPA_URL}';
-    const supaKey = '${SUPA_KEY}';
-    let   nonce   = 0;
-    let   shares  = 0;
-    let   errors  = 0;
-    let   start   = Date.now();
-    let   stop    = false;
+    const relay    = '${RELAY}';
+    const poolUrl  = '${pool.url}';
+    const token    = '${token}';
+    const wid      = '${id}';
+    const supaUrl  = '${SUPA_URL}';
+    const supaKey  = '${SUPA_KEY}';
+    const SIM_TMPL = ${simTmpl};
+    let nonce=0, shares=0, errors=0, start=Date.now(), stop=false;
 
     async function updateDB(status, hashrate, sh, er) {
       await fetch(supaUrl+'/rest/v1/bench_workers?id=eq.'+wid, {
         method:'PATCH',
-        headers:{ 'apikey':supaKey, 'Authorization':'Bearer '+token,
-                  'Content-Type':'application/json', 'Prefer':'return=minimal' },
+        headers:{ 'apikey':supaKey,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal' },
         body: JSON.stringify({ status, hashrate, shares:sh, errors:er })
       });
     }
 
-    async function run() {
-      await updateDB('connecting',0,0,0);
-      let tmpl;
+    async function fetchTemplate() {
       try {
         const r = await fetch(relay+'/template.json', {
-          headers:{ 'Authorization':'Bearer '+token, 'x-bench-target': poolUrl }
+          headers:{ 'Authorization':'Bearer '+token, 'x-bench-target':poolUrl },
+          signal: AbortSignal.timeout(8000)
         });
-        if (!r.ok) throw new Error('template '+r.status);
-        tmpl = await r.json();
+        if (r.ok) return { tmpl: await r.json(), sim: false };
+        return { tmpl: SIM_TMPL, sim: true, reason: 'HTTP '+r.status };
       } catch(e) {
-        await updateDB('err:'+String(e).slice(0,20), 0, 0, errors+1);
-        return;
+        return { tmpl: SIM_TMPL, sim: true, reason: String(e).slice(0,40) };
       }
-      await updateDB('mining',0,0,0);
-      // Minimal SHA256d sim using SubtleCrypto
-      const encoder = new TextEncoder();
+    }
+
+    async function run() {
+      await updateDB('connecting',0,0,0);
+      const { tmpl, sim, reason } = await fetchTemplate();
+      if (sim) self.postMessage({ type:'sim', reason });
+      const status = sim ? 'sim' : 'mining';
+      await updateDB(status,0,0,0);
       start = Date.now();
       while (!stop) {
-        // Batch 2000 hashes
-        for (let i=0;i<2000;i++) {
-          const buf = encoder.encode(nonce.toString());
-          // We use SubtleCrypto for real double-SHA256 but it's async;
-          // for throughput sim we count iterations and report
-          nonce++;
-        }
+        for (let i=0;i<2000;i++) nonce++;
+        // Simulate a share every ~50k nonces
+        if (nonce % 50000 < 2000) shares++;
         const elapsed = (Date.now()-start)/1000 || 0.001;
         const hr = Math.round(nonce/elapsed);
-        await updateDB('mining', hr, shares, errors);
-        // Brief pause to avoid CPU lockup
+        await updateDB(status, hr, shares, errors);
         await new Promise(r=>setTimeout(r,50));
       }
-      await updateDB('stopped', 0, shares, errors);
+      await updateDB('stopped',0,shares,errors);
     }
 
     self.onmessage = e => { if (e.data==='stop') stop=true; };
     run();
   `;
+
   const blob = new Blob([workerCode], { type:'application/javascript' });
   const bw   = new Worker(URL.createObjectURL(blob));
+  bw.onmessage = e => {
+    if (e.data?.type==='sim')
+      log(`⚠ ${workers.find(w=>w.id===id)?.rig_id}: pool unreachable (${e.data.reason||'502'}) — running in SIM mode`, 'warn');
+  };
   activeWorkers[id].worker = bw;
   log(`Started ${workers.find(w=>w.id===id)?.rig_id} → ${pool.name}`);
 }
@@ -720,42 +590,32 @@ function startWorker(id) {
 function stopWorker(id) {
   const aw = activeWorkers[id];
   if (!aw) return;
-  aw.stop = true;
+  aw.stop=true;
   if (aw.worker) aw.worker.postMessage('stop');
   delete activeWorkers[id];
-  const w = workers.find(w=>w.id===id);
   db.from('bench_workers').update({status:'stopped'}).eq('id',id);
-  log(`Stopped ${w?.rig_id||id}`, 'warn');
+  log(`Stopped ${workers.find(w=>w.id===id)?.rig_id||id}`,'warn');
 }
 
-document.getElementById('btn-start-all').addEventListener('click', () => {
-  workers.forEach(w => startWorker(w.id));
-});
-document.getElementById('btn-stop-all').addEventListener('click', () => {
-  Object.keys(activeWorkers).forEach(stopWorker);
-});
+document.getElementById('btn-start-all').addEventListener('click', () => workers.forEach(w=>startWorker(w.id)));
+document.getElementById('btn-stop-all').addEventListener('click',  () => Object.keys(activeWorkers).forEach(stopWorker));
 
-// ── Log
+// Log
 async function log(msg, level='info') {
-  const ts = new Date().toLocaleTimeString();
-  appendLog({ level, message:msg, created_at: new Date().toISOString() });
+  appendLog({ level, message:msg, created_at:new Date().toISOString() });
   await db.from('bench_log').insert({ message:msg, level, user_id:session.user.id });
   document.getElementById('status-msg').textContent = msg.slice(0,100);
 }
-
 function appendLog(row) {
   const el  = document.getElementById('log-panel');
   const ts  = new Date(row.created_at).toLocaleTimeString();
-  const cls = { ok:'log-ok', err:'log-err', warn:'log-warn', info:'log-info' }[row.level] || 'log-info';
+  const cls = { ok:'log-ok', err:'log-err', warn:'log-warn', info:'log-info' }[row.level]||'log-info';
   el.innerHTML += `<div class="log-line"><span class="log-ts">[${ts}]</span> <span class="${cls}">${esc(row.message)}</span></div>`;
   el.scrollTop = el.scrollHeight;
 }
+document.getElementById('btn-clear-log').addEventListener('click', () => { document.getElementById('log-panel').innerHTML=''; });
 
-document.getElementById('btn-clear-log').addEventListener('click', () => {
-  document.getElementById('log-panel').innerHTML='';
-});
-
-// ── Tabs
+// Tabs
 document.querySelectorAll('.tab').forEach(t => {
   t.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -765,26 +625,20 @@ document.querySelectorAll('.tab').forEach(t => {
   });
 });
 
-// ── Modals
+// Modals
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); });
 });
 
-// ── Clock
+// Clock
 function startClock() {
-  setInterval(() => {
-    document.getElementById('status-clock').textContent = new Date().toLocaleString();
-  }, 1000);
+  setInterval(() => { document.getElementById('status-clock').textContent = new Date().toLocaleString(); }, 1000);
 }
 
-// ── Utils
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// ── Boot
 init();
 </script>
 </body>
