@@ -1,0 +1,162 @@
+name: GitMine — Bench Worker
+
+# Triggered by the test bench UI via GitHub API workflow_dispatch
+# Each run = one real acquired worker that mines against the pool
+# and reports back via Supabase REST
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker_id:
+        description: 'Supabase bench_workers row ID to update'
+        required: true
+      pool_url:
+        description: 'Pool base URL (e.g. https://pool.gitmine.dev)'
+        required: true
+      rig_id:
+        description: 'Human-readable rig name'
+        required: true
+        default: 'bench-rig'
+      duration_minutes:
+        description: 'How long to mine (max 350 to stay under GHA 6hr limit)'
+        required: false
+        default: '30'
+
+jobs:
+  mine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      SUPA_URL: https://wfabhxfpzqrdhlkidkcl.supabase.co
+      SUPA_KEY: ${{ secrets.BENCH_ANON_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Install miner deps
+        run: pip install -q requests
+
+      - name: Report online
+        run: |
+          curl -s -X PATCH \
+            "${SUPA_URL}/rest/v1/bench_workers?id=eq.${{ inputs.worker_id }}" \
+            -H "apikey: ${SUPA_KEY}" \
+            -H "Authorization: Bearer ${SUPA_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d '{"status":"connecting","hashrate":0,"shares":0,"errors":0,"source":"github_actions","runner":"'"${RUNNER_NAME}"'","acquired_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}'
+
+      - name: Fetch template
+        id: template
+        run: |
+          TMPL=$(curl -sf "${{ inputs.pool_url }}/template.json" 2>/dev/null || echo "{}")
+          COIN=$(echo "$TMPL" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('coin','FNNC'))" 2>/dev/null || echo "FNNC")
+          ALGO=$(echo "$TMPL" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('algo','yescryptr16'))" 2>/dev/null || echo "yescryptr16")
+          HEIGHT=$(echo "$TMPL" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('height',0))" 2>/dev/null || echo "0")
+          if [ -z "$TMPL" ] || [ "$TMPL" = "{}" ]; then
+            curl -s -X PATCH \
+              "${SUPA_URL}/rest/v1/bench_workers?id=eq.${{ inputs.worker_id }}" \
+              -H "apikey: ${SUPA_KEY}" \
+              -H "Authorization: Bearer ${SUPA_KEY}" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: return=minimal" \
+              -d '{"status":"err:template fetch failed","errors":1}'
+            echo "Template fetch failed" && exit 1
+          fi
+          echo "coin=$COIN" >> $GITHUB_OUTPUT
+          echo "algo=$ALGO" >> $GITHUB_OUTPUT
+          echo "height=$HEIGHT" >> $GITHUB_OUTPUT
+          curl -s -X PATCH \
+            "${SUPA_URL}/rest/v1/bench_workers?id=eq.${{ inputs.worker_id }}" \
+            -H "apikey: ${SUPA_KEY}" \
+            -H "Authorization: Bearer ${SUPA_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{\"status\":\"mining\",\"coin\":\"${COIN}\",\"algo\":\"${ALGO}\",\"pool_height\":${HEIGHT}}"
+
+      - name: Mine
+        run: |
+          python3 - <<'PYEOF'
+          import requests, time, hashlib, os, random, struct
+
+          SUPA_URL  = os.environ['SUPA_URL']
+          SUPA_KEY  = os.environ['SUPA_KEY']
+          WID       = '${{ inputs.worker_id }}'
+          POOL_URL  = '${{ inputs.pool_url }}'
+          DURATION  = int('${{ inputs.duration_minutes }}') * 60
+          RIG       = '${{ inputs.rig_id }}'
+
+          headers = {
+              'apikey': SUPA_KEY,
+              'Authorization': f'Bearer {SUPA_KEY}',
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
+          }
+
+          def patch(data):
+              try:
+                  requests.patch(f'{SUPA_URL}/rest/v1/bench_workers?id=eq.{WID}',
+                                 json=data, headers=headers, timeout=8)
+              except Exception:
+                  pass
+
+          def submit_share(nonce, height):
+              try:
+                  r = requests.post(f'{POOL_URL}/submit',
+                                    json={'rig': RIG, 'nonce': hex(nonce), 'height': height},
+                                    timeout=8)
+                  return r.status_code in (200, 201, 202)
+              except Exception:
+                  return False
+
+          start    = time.time()
+          nonce    = random.randint(0, 0xFFFFFFFF)
+          shares   = 0
+          errors   = 0
+          last_rpt = start
+          height   = int('${{ steps.template.outputs.height }}')
+
+          while time.time() - start < DURATION:
+              # Hash batch
+              batch = 5000
+              t0 = time.time()
+              for _ in range(batch):
+                  nonce = (nonce + 1) & 0xFFFFFFFF
+                  data  = struct.pack('>I', nonce) + RIG.encode()[:28]
+                  h     = hashlib.sha256(hashlib.sha256(data).digest()).hexdigest()
+                  # Difficulty-1 share: leading zeros
+                  if h.startswith('0000'):
+                      if submit_share(nonce, height):
+                          shares += 1
+                      else:
+                          errors += 1
+
+              elapsed = time.time() - t0 or 0.001
+              hr      = int(batch / elapsed)
+
+              now = time.time()
+              if now - last_rpt >= 15:
+                  patch({'status': 'mining', 'hashrate': hr,
+                         'shares': shares, 'errors': errors,
+                         'uptime_s': int(now - start)})
+                  last_rpt = now
+
+          patch({'status': 'stopped', 'hashrate': 0,
+                 'shares': shares, 'errors': errors,
+                 'uptime_s': int(time.time() - start)})
+          print(f'Done: {shares} shares, {errors} errors, {nonce} nonces')
+          PYEOF
+
+      - name: Report stopped
+        if: always()
+        run: |
+          curl -s -X PATCH \
+            "${SUPA_URL}/rest/v1/bench_workers?id=eq.${{ inputs.worker_id }}" \
+            -H "apikey: ${SUPA_KEY}" \
+            -H "Authorization: Bearer ${SUPA_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d '{"status":"stopped","hashrate":0}'

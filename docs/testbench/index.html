@@ -3,24 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GitMine Pool Test Bench</title>
+<title>GitMine — Acquisition Test Bench</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0f1117;--bg2:#1a1d27;--bg3:#252836;
   --accent:#7c5cbf;--accent2:#5e9bdc;
-  --green:#3ddc84;--red:#ff5c5c;--yellow:#f5c542;
+  --green:#3ddc84;--red:#ff5c5c;--yellow:#f5c542;--orange:#ff9f40;
   --fg:#e8e8f0;--fg2:#9090a8;
   --font:'Consolas',monospace;
 }
 body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:13px;min-height:100vh}
 a{color:var(--accent2)}
-#topbar{
-  background:var(--bg3);height:46px;display:flex;align-items:center;
-  padding:0 18px;gap:10px;border-bottom:1px solid #2a2d3e;
-  position:sticky;top:0;z-index:100;
-}
+#topbar{background:var(--bg3);height:46px;display:flex;align-items:center;padding:0 18px;gap:10px;border-bottom:1px solid #2a2d3e;position:sticky;top:0;z-index:100;}
 #topbar .logo{color:var(--accent);font-size:15px;font-weight:bold;margin-right:12px}
 .btn{padding:5px 14px;border:none;border-radius:4px;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:bold;transition:.15s;}
 .btn:hover{opacity:.85}
@@ -29,18 +25,18 @@ a{color:var(--accent2)}
 .btn-red{background:var(--red);color:#fff}
 .btn-yellow{background:var(--yellow);color:#000}
 .btn-ghost{background:var(--bg3);color:var(--fg2);border:1px solid #333}
+.btn-orange{background:var(--orange);color:#000}
 #auth-area{margin-left:auto;display:flex;align-items:center;gap:10px}
 #user-info{color:var(--fg2);font-size:12px}
 #avatar{width:28px;height:28px;border-radius:50%;border:2px solid var(--accent)}
 #layout{display:flex;height:calc(100vh - 70px)}
-#sidebar{width:210px;min-width:180px;background:var(--bg2);border-right:1px solid #2a2d3e;padding:14px 12px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;}
+#sidebar{width:220px;min-width:200px;background:var(--bg2);border-right:1px solid #2a2d3e;padding:14px 12px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;}
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .side-label{color:var(--fg2);font-size:11px;font-weight:bold;margin:10px 0 4px;letter-spacing:.08em}
-.stat-row{display:flex;justify-content:space-between;padding:2px 0}
+.stat-row{display:flex;justify-content:space-between;padding:3px 0;font-size:12px}
 .stat-val{color:var(--fg);font-weight:bold}
 .pool-dot{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px}
-.dot{font-size:14px}
-.dot-green{color:var(--green)}.dot-red{color:var(--red)}.dot-grey{color:var(--fg2)}
+.dot{font-size:14px}.dot-green{color:var(--green)}.dot-red{color:var(--red)}.dot-grey{color:var(--fg2)}.dot-yellow{color:var(--yellow)}
 #tabs{display:flex;background:var(--bg2);border-bottom:1px solid #2a2d3e}
 .tab{padding:10px 20px;cursor:pointer;color:var(--fg2);font-weight:bold;font-size:12px;border-bottom:2px solid transparent;transition:.15s;}
 .tab:hover{color:var(--fg)}
@@ -51,23 +47,46 @@ a{color:var(--accent2)}
 .bench-table th{background:var(--bg3);color:var(--accent2);text-align:left;padding:7px 10px;position:sticky;top:0;white-space:nowrap;}
 .bench-table td{padding:6px 10px;border-bottom:1px solid #1e2130;white-space:nowrap}
 .bench-table tr:hover td{background:var(--bg3)}
-.tag-ok{color:var(--green)}.tag-fail{color:var(--red)}.tag-warn{color:var(--yellow)}.tag-idle{color:var(--fg2)}
+.tag-ok{color:var(--green)}.tag-fail{color:var(--red)}.tag-warn{color:var(--yellow)}.tag-idle{color:var(--fg2)}.tag-info{color:var(--accent2)}
+/* Worker cards */
 #worker-cards{display:flex;flex-wrap:wrap;gap:12px;padding:14px}
-.worker-card{background:var(--bg2);border:1px solid #2a2d3e;border-radius:8px;padding:14px 18px;min-width:220px;position:relative;transition:.2s;}
+.worker-card{background:var(--bg2);border:1px solid #2a2d3e;border-radius:8px;padding:14px 18px;min-width:230px;position:relative;transition:.2s;}
 .worker-card.mining{border-color:var(--green)}
+.worker-card.connecting{border-color:var(--yellow)}
 .worker-card.error{border-color:var(--red)}
-.wc-rig{font-size:14px;font-weight:bold;margin-bottom:4px}
+.wc-rig{font-size:14px;font-weight:bold;margin-bottom:2px}
+.wc-src{font-size:10px;color:var(--orange);margin-bottom:6px}
 .wc-pool{color:var(--accent2);font-size:11px;margin-bottom:8px}
 .wc-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px}
 .wc-stat label{color:var(--fg2);font-size:10px}
 .wc-stat span{font-size:13px;font-weight:bold}
-.wc-actions{margin-top:10px;display:flex;gap:6px}
+.wc-actions{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+/* Acquisition panel */
+#acq-panel{padding:14px;display:flex;flex-direction:column;gap:12px}
+.acq-card{background:var(--bg2);border:1px solid #2a2d3e;border-radius:8px;padding:16px 20px}
+.acq-card h4{color:var(--accent2);font-size:12px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
+.acq-form{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.acq-field{display:flex;flex-direction:column;gap:3px}
+.acq-field label{color:var(--fg2);font-size:10px}
+.acq-field input,.acq-field select{background:var(--bg3);color:var(--fg);border:1px solid #333;padding:5px 10px;border-radius:4px;font-family:var(--font);font-size:12px;min-width:140px}
+/* Pipeline timeline */
+#pipeline-rows{display:flex;flex-direction:column;gap:6px}
+.pipeline-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border-radius:6px;font-size:12px}
+.pipeline-step{padding:2px 8px;border-radius:3px;font-size:10px;font-weight:bold}
+.ps-dispatched{background:#2a2d3e;color:var(--fg2)}
+.ps-connecting{background:var(--yellow);color:#000}
+.ps-mining{background:var(--green);color:#000}
+.ps-stopped{background:var(--bg3);color:var(--fg2);border:1px solid #333}
+.ps-error{background:var(--red);color:#fff}
+/* Assign */
 #assign-controls{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg2);border-bottom:1px solid #2a2d3e;flex-wrap:wrap;}
-#assign-controls select,#assign-controls input{background:var(--bg3);color:var(--fg);border:1px solid #333;padding:5px 10px;border-radius:4px;font-family:var(--font);font-size:12px;}
+#assign-controls select{background:var(--bg3);color:var(--fg);border:1px solid #333;padding:5px 10px;border-radius:4px;font-family:var(--font);font-size:12px;}
+/* Log */
 #log-panel{flex:1;background:var(--bg2);font-size:12px;overflow-y:auto;padding:10px 14px;font-family:var(--font);}
 .log-line{padding:2px 0;line-height:1.5}
 .log-ts{color:var(--fg2)}
 .log-ok{color:var(--green)}.log-err{color:var(--red)}.log-warn{color:var(--yellow)}.log-info{color:var(--accent2)}
+/* Modals */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex}
 .modal{background:var(--bg2);border:1px solid var(--accent);border-radius:8px;padding:24px 28px;min-width:380px;max-width:96vw;}
@@ -77,10 +96,12 @@ a{color:var(--accent2)}
 .field input,.field select{background:var(--bg3);color:var(--fg);border:1px solid #333;padding:7px 10px;border-radius:4px;font-family:var(--font);font-size:13px;}
 .field input:focus,.field select:focus{outline:1px solid var(--accent)}
 .modal-actions{display:flex;gap:8px;margin-top:16px}
+/* Status bar */
 #statusbar{height:24px;background:var(--bg3);border-top:1px solid #2a2d3e;display:flex;align-items:center;padding:0 14px;font-size:11px;color:var(--fg2);justify-content:space-between;}
+/* Login */
 #login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:20px;}
 #login-screen h1{color:var(--accent);font-size:22px}
-#login-screen p{color:var(--fg2);max-width:380px;text-align:center;line-height:1.6}
+#login-screen p{color:var(--fg2);max-width:420px;text-align:center;line-height:1.6}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
@@ -89,19 +110,19 @@ a{color:var(--accent2)}
 <body>
 
 <div id="login-screen">
-  <h1>⛏ GitMine Pool Test Bench</h1>
-  <p>Sign in with GitHub to manage pools, simulate workers, and test mining endpoints — all saved to your account.</p>
+  <h1>⛏ GitMine Acquisition Test Bench</h1>
+  <p>Sign in with GitHub to dispatch real free-resource workers, test pool connectivity, and measure the full acquisition pipeline from dispatch to first share.</p>
   <button class="btn btn-accent" id="btn-github-login" style="font-size:14px;padding:10px 28px">Sign in with GitHub</button>
-  <p style="font-size:11px;color:var(--fg2)">Your pool configs and workers are private to your account via Row-Level Security.</p>
+  <p style="font-size:11px;color:var(--fg2)">Requires a GitHub PAT with <code>workflow</code> scope stored in settings to dispatch workers.</p>
 </div>
 
 <div id="app" style="display:none">
   <div id="topbar">
     <span class="logo">⛏ GitMine Test Bench</span>
+    <button class="btn btn-orange" id="btn-acquire">+ Acquire Worker</button>
     <button class="btn btn-accent" id="btn-add-pool">+ Pool</button>
-    <button class="btn btn-green"  id="btn-add-worker">+ Worker</button>
-    <button class="btn btn-ghost"  id="btn-test-all">Test All</button>
-    <button class="btn btn-green"  id="btn-start-all">Start All</button>
+    <button class="btn btn-ghost"  id="btn-test-all">Test Pools</button>
+    <button class="btn btn-ghost"  id="btn-refresh-fleet">Sync Fleet</button>
     <button class="btn btn-red"    id="btn-stop-all">Stop All</button>
     <div id="auth-area">
       <span id="user-info"></span>
@@ -112,57 +133,91 @@ a{color:var(--accent2)}
 
   <div id="layout">
     <div id="sidebar">
-      <div class="side-label">STATS</div>
-      <div class="stat-row"><span>Pools</span>   <span class="stat-val" id="s-pools">0</span></div>
-      <div class="stat-row"><span>Workers</span> <span class="stat-val" id="s-workers">0</span></div>
-      <div class="stat-row"><span>Mining</span>  <span class="stat-val" id="s-mining" style="color:var(--green)">0</span></div>
-      <div class="stat-row"><span>H/s</span>     <span class="stat-val" id="s-hs" style="color:var(--green)">0</span></div>
-      <div class="stat-row"><span>Shares</span>  <span class="stat-val" id="s-shares">0</span></div>
-      <div class="stat-row"><span>Errors</span>  <span class="stat-val" id="s-errors">0</span></div>
+      <div class="side-label">FLEET</div>
+      <div class="stat-row"><span>Acquired</span>  <span class="stat-val" id="s-acquired">0</span></div>
+      <div class="stat-row"><span>Mining</span>    <span class="stat-val" id="s-mining" style="color:var(--green)">0</span></div>
+      <div class="stat-row"><span>Total H/s</span> <span class="stat-val" id="s-hs" style="color:var(--green)">0</span></div>
+      <div class="stat-row"><span>Shares</span>    <span class="stat-val" id="s-shares">0</span></div>
+      <div class="stat-row"><span>Errors</span>    <span class="stat-val" id="s-errors" style="color:var(--red)">0</span></div>
+      <div class="side-label">POOL</div>
+      <div class="stat-row"><span>Height</span>    <span class="stat-val" id="s-height">—</span></div>
+      <div class="stat-row"><span>Coin</span>      <span class="stat-val" id="s-coin">—</span></div>
+      <div class="stat-row"><span>Algo</span>      <span class="stat-val" id="s-algo">—</span></div>
       <div class="side-label">POOLS</div>
       <div id="sidebar-pools"></div>
+      <div class="side-label">SETTINGS</div>
+      <div class="stat-row" style="flex-direction:column;gap:4px">
+        <label style="color:var(--fg2);font-size:10px">GitHub PAT (workflow scope)</label>
+        <input id="gh-pat" type="password" placeholder="ghp_..." style="background:var(--bg3);color:var(--fg);border:1px solid #333;padding:4px 8px;border-radius:4px;font-family:var(--font);font-size:11px;width:100%">
+        <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px" onclick="savePat()">Save PAT</button>
+      </div>
+      <div class="stat-row" style="flex-direction:column;gap:4px;margin-top:8px">
+        <label style="color:var(--fg2);font-size:10px">Pool URL</label>
+        <input id="pool-url-setting" placeholder="https://ox518.github.io/genFre" style="background:var(--bg3);color:var(--fg);border:1px solid #333;padding:4px 8px;border-radius:4px;font-family:var(--font);font-size:11px;width:100%">
+        <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px" onclick="savePoolUrl()">Save URL</button>
+      </div>
     </div>
 
     <div id="main">
       <div id="tabs">
-        <div class="tab active" data-tab="pools">Pools</div>
+        <div class="tab active" data-tab="acquire">Acquisition</div>
         <div class="tab" data-tab="workers">Workers</div>
-        <div class="tab" data-tab="assign">Assign</div>
+        <div class="tab" data-tab="pools">Pools</div>
         <div class="tab" data-tab="log">Log</div>
       </div>
 
-      <div class="tab-pane active" id="pane-pools">
+      <!-- ACQUISITION TAB -->
+      <div class="tab-pane active" id="pane-acquire">
+        <div id="acq-panel">
+          <div class="acq-card">
+            <h4>Dispatch Free-Resource Worker</h4>
+            <div class="acq-form">
+              <div class="acq-field">
+                <label>Rig Name</label>
+                <input id="acq-rig" placeholder="bench-rig-01" value="bench-rig-01">
+              </div>
+              <div class="acq-field">
+                <label>Duration (minutes)</label>
+                <input id="acq-duration" type="number" value="30" min="1" max="350" style="min-width:80px">
+              </div>
+              <div class="acq-field">
+                <label>Pool URL</label>
+                <input id="acq-pool-url" placeholder="https://ox518.github.io/genFre" style="min-width:260px">
+              </div>
+              <button class="btn btn-orange" style="align-self:flex-end" onclick="dispatchWorker()">Dispatch via GitHub Actions</button>
+            </div>
+          </div>
+
+          <div class="acq-card">
+            <h4>Acquisition Pipeline</h4>
+            <div id="pipeline-rows">
+              <div style="color:var(--fg2);font-size:12px">No workers dispatched yet. Click &ldquo;Dispatch&rdquo; above.</div>
+            </div>
+          </div>
+
+          <div class="acq-card">
+            <h4>Fleet Registry (fleet/harvest/workers.yaml)</h4>
+            <div id="fleet-registry" style="color:var(--fg2);font-size:12px">Click &ldquo;Sync Fleet&rdquo; to load.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WORKERS TAB -->
+      <div class="tab-pane" id="pane-workers">
+        <div id="worker-cards"></div>
+      </div>
+
+      <!-- POOLS TAB -->
+      <div class="tab-pane" id="pane-pools">
         <table class="bench-table">
           <thead><tr>
-            <th>Name</th><th>URL</th><th>Coin</th><th>User</th>
-            <th>Up</th><th>Protocol</th><th>Height</th><th>Latency</th><th>Auth</th><th></th>
+            <th>Name</th><th>URL</th><th>Coin</th><th>Up</th><th>Height</th><th>Latency</th><th>Auth</th><th></th>
           </tr></thead>
           <tbody id="pool-tbody"></tbody>
         </table>
       </div>
 
-      <div class="tab-pane" id="pane-workers">
-        <div id="worker-cards"></div>
-      </div>
-
-      <div class="tab-pane" id="pane-assign" style="padding:0;display:flex;flex-direction:column">
-        <div id="assign-controls">
-          <label style="color:var(--fg2);font-size:12px">Target Pool:</label>
-          <select id="assign-pool-select"></select>
-          <button class="btn btn-accent" id="btn-assign-selected">Assign Selected</button>
-          <button class="btn btn-yellow" id="btn-assign-all">Assign ALL →</button>
-        </div>
-        <div style="flex:1;overflow:auto">
-          <table class="bench-table">
-            <thead><tr>
-              <th><input type="checkbox" id="chk-all"></th>
-              <th>Rig ID</th><th>Current Pool</th><th>Status</th><th></th>
-            </tr></thead>
-            <tbody id="assign-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-
+      <!-- LOG TAB -->
       <div class="tab-pane" id="pane-log" style="padding:0;display:flex;flex-direction:column">
         <div style="padding:6px 14px;background:var(--bg3);display:flex;gap:8px;border-bottom:1px solid #2a2d3e">
           <button class="btn btn-ghost" id="btn-clear-log" style="padding:3px 10px">Clear</button>
@@ -182,8 +237,8 @@ a{color:var(--accent2)}
 <div class="modal-overlay" id="modal-add-pool">
   <div class="modal">
     <h3>Add Pool</h3>
-    <div class="field"><label>Pool Name</label><input id="ap-name" placeholder="My Test Pool"></div>
-    <div class="field"><label>Pool URL</label><input id="ap-url" placeholder="https://pool.example.com"></div>
+    <div class="field"><label>Pool Name</label><input id="ap-name" placeholder="GenFre Pool"></div>
+    <div class="field"><label>Pool URL</label><input id="ap-url" placeholder="https://ox518.github.io/genFre"></div>
     <div class="field"><label>Username / Address</label><input id="ap-user" placeholder="your-wallet-address"></div>
     <div class="field"><label>Password</label><input id="ap-pass" type="password" placeholder="x"></div>
     <div class="field"><label>Coin</label>
@@ -196,35 +251,46 @@ a{color:var(--accent2)}
   </div>
 </div>
 
-<!-- ADD WORKER MODAL -->
-<div class="modal-overlay" id="modal-add-worker">
-  <div class="modal">
-    <h3>Add Worker(s)</h3>
-    <div class="field"><label>Rig ID (base name)</label><input id="aw-rig" placeholder="bench-rig"></div>
-    <div class="field"><label>Count</label><input id="aw-count" type="number" min="1" max="50" value="1"></div>
-    <div class="field"><label>Assign to Pool</label>
-      <select id="aw-pool"><option value="">— unassigned —</option></select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-green" id="aw-save">Add Worker(s)</button>
-      <button class="btn btn-ghost" id="aw-cancel">Cancel</button>
-    </div>
-  </div>
-</div>
-
 <script>
-const SUPA_URL = 'https://wfabhxfpzqrdhlkidkcl.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYWJoeGZwenFyZGhsa2lka2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NzE0NDIsImV4cCI6MjA5NjQ0NzQ0Mn0.cZKRmChbUr8pRJVljv2TAnjW-Xivx_GtTaBSpQJL6oA';
-const RELAY    = `${SUPA_URL}/functions/v1/bench-relay`;
+const SUPA_URL  = 'https://wfabhxfpzqrdhlkidkcl.supabase.co';
+const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYWJoeGZwenFyZGhsa2lka2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NzE0NDIsImV4cCI6MjA5NjQ0NzQ0Mn0.cZKRmChbUr8pRJVljv2TAnjW-Xivx_GtTaBSpQJL6oA';
+const RELAY     = `${SUPA_URL}/functions/v1/bench-relay`;
+const GH_REPO   = 'Ox518/genFre';
+const GH_WF     = 'bench-worker.yml';
+const RAW_BASE  = 'https://raw.githubusercontent.com/Ox518/genFre/main';
+const DEFAULT_POOL = 'https://ox518.github.io/genFre';
 
 const { createClient } = supabase;
 const db = createClient(SUPA_URL, SUPA_KEY);
 
 let pools=[], workers=[], assignments={};
 let session=null;
-let activeWorkers={};
+let dispatchedRuns={}; // run_id -> {rig_id, worker_id, dispatched_at}
 
+// ── Persisted settings
+function loadSettings() {
+  const pat = localStorage.getItem('gm_gh_pat') || '';
+  const url = localStorage.getItem('gm_pool_url') || DEFAULT_POOL;
+  document.getElementById('gh-pat').value = pat;
+  document.getElementById('pool-url-setting').value = url;
+  document.getElementById('acq-pool-url').value = url;
+}
+function savePat() {
+  localStorage.setItem('gm_gh_pat', document.getElementById('gh-pat').value.trim());
+  log('GitHub PAT saved (local only)', 'ok');
+}
+function savePoolUrl() {
+  const u = document.getElementById('pool-url-setting').value.trim();
+  localStorage.setItem('gm_pool_url', u);
+  document.getElementById('acq-pool-url').value = u;
+  log('Pool URL saved', 'ok');
+}
+function getPat()     { return localStorage.getItem('gm_gh_pat') || ''; }
+function getPoolUrl() { return localStorage.getItem('gm_pool_url') || DEFAULT_POOL; }
+
+// ── Auth
 async function init() {
+  loadSettings();
   const { data: { session: s } } = await db.auth.getSession();
   session = s;
   if (session) showApp();
@@ -248,6 +314,10 @@ async function showApp() {
   await loadAll();
   subscribeRealtime();
   startClock();
+  refreshFleet();
+  refreshPoolTemplate();
+  setInterval(refreshPoolTemplate, 30000);
+  setInterval(pollRunStatuses, 20000);
 }
 
 document.getElementById('btn-github-login').addEventListener('click', () => {
@@ -255,6 +325,7 @@ document.getElementById('btn-github-login').addEventListener('click', () => {
 });
 document.getElementById('btn-logout').addEventListener('click', () => db.auth.signOut());
 
+// ── Load from Supabase
 async function loadAll() {
   const [{ data: p }, { data: w }, { data: a }] = await Promise.all([
     db.from('bench_pools').select('*').order('created_at'),
@@ -276,8 +347,45 @@ function subscribeRealtime() {
     .subscribe();
 }
 
-function renderAll() {
-  renderPools(); renderWorkers(); renderAssign(); renderSidebar(); renderPoolSelects();
+// ── Render
+function renderAll() { renderWorkers(); renderPools(); renderSidebar(); renderPipeline(); }
+
+function renderWorkers() {
+  const el = document.getElementById('worker-cards');
+  el.innerHTML = '';
+  if (!workers.length) {
+    el.innerHTML = '<div style="padding:20px;color:var(--fg2)">No workers yet. Use the Acquisition tab to dispatch a real worker via GitHub Actions.</div>';
+    return;
+  }
+  workers.forEach(w => {
+    const pid  = assignments[w.id];
+    const pool = pools.find(p=>p.id===pid);
+    const isErr = (w.status||'').startsWith('err');
+    const isMining = w.status==='mining';
+    const isConn   = w.status==='connecting';
+    const cls  = isMining ? 'mining' : (isConn ? 'connecting' : (isErr ? 'error' : ''));
+    const srcLabel = w.source ? `<div class="wc-src">★ ${esc(w.source)}</div>` : '';
+    const card = document.createElement('div');
+    card.className = `worker-card ${cls}`;
+    card.id = `card-${w.id}`;
+    card.innerHTML = `
+      <div class="wc-rig">${esc(w.rig_id)}</div>
+      ${srcLabel}
+      <div class="wc-pool">${pool ? '→ '+esc(pool.name) : (w.pool_url ? '→ '+esc(w.pool_url) : '<span style="color:var(--yellow)">unassigned</span>')}</div>
+      <div class="wc-stats">
+        <div class="wc-stat"><label>Status</label><span style="color:${isErr?'var(--red)':(isMining?'var(--green)':'inherit')}">${esc(w.status||'idle')}</span></div>
+        <div class="wc-stat"><label>H/s</label><span style="color:var(--green)">${Math.round(w.hashrate||0).toLocaleString()}</span></div>
+        <div class="wc-stat"><label>Shares</label><span>${w.shares||0}</span></div>
+        <div class="wc-stat"><label>Errors</label><span style="color:${(w.errors||0)>0?'var(--red)':'inherit'}">${w.errors||0}</span></div>
+        ${w.uptime_s ? `<div class="wc-stat"><label>Uptime</label><span>${fmtUptime(w.uptime_s)}</span></div>` : ''}
+        ${w.runner   ? `<div class="wc-stat"><label>Runner</label><span style="font-size:10px">${esc(w.runner.slice(0,20))}</span></div>` : ''}
+      </div>
+      <div class="wc-actions">
+        <a class="btn btn-ghost" style="padding:3px 10px;font-size:11px" href="https://github.com/${GH_REPO}/actions" target="_blank">↗ Actions</a>
+        <button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;color:var(--red)" onclick="removeWorker('${w.id}')">✕ Remove</button>
+      </div>`;
+    el.appendChild(card);
+  });
 }
 
 function renderPools() {
@@ -290,99 +398,176 @@ function renderPools() {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${esc(p.name)}</td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(p.url)}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(p.url)}</td>
       <td>${esc(p.coin||'')}</td>
-      <td>${esc((p.username||'').slice(0,18))}</td>
-      <td>${ok}</td><td>${esc(tr.protocol||'—')}</td><td>${tr.height||'—'}</td>
+      <td>${ok}</td><td>${tr.height||'—'}</td>
       <td>${tr.latency_ms ? tr.latency_ms+'ms' : '—'}</td><td>${auth}</td>
       <td>
-        <button class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="testPool('${p.id}')">Test</button>
+        <button class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="testPoolById('${p.id}')">Test</button>
         <button class="btn btn-ghost" style="padding:2px 8px;font-size:11px;color:var(--red)" onclick="removePool('${p.id}')">✕</button>
       </td>`;
     tb.appendChild(row);
   });
 }
 
-function renderWorkers() {
-  const el = document.getElementById('worker-cards');
-  el.innerHTML = '';
-  workers.forEach(w => {
-    const pid  = assignments[w.id];
-    const pool = pools.find(p=>p.id===pid);
-    const isErr = w.status?.startsWith('err');
-    const cls  = w.status==='mining' ? 'mining' : (isErr ? 'error' : '');
-    const card = document.createElement('div');
-    card.className = `worker-card ${cls}`;
-    card.id = `card-${w.id}`;
-    card.innerHTML = `
-      <div class="wc-rig">${esc(w.rig_id)}</div>
-      <div class="wc-pool">${pool ? '→ '+esc(pool.name) : '<span style="color:var(--yellow)">unassigned</span>'}</div>
-      <div class="wc-stats">
-        <div class="wc-stat"><label>Status</label><span style="color:${isErr?'var(--red)':'inherit'}">${esc(w.status||'idle')}</span></div>
-        <div class="wc-stat"><label>H/s</label><span style="color:var(--green)">${Math.round(w.hashrate||0)}</span></div>
-        <div class="wc-stat"><label>Shares</label><span>${w.shares||0}</span></div>
-        <div class="wc-stat"><label>Errors</label><span style="color:var(--red)">${w.errors||0}</span></div>
-      </div>
-      <div class="wc-actions">
-        <button class="btn btn-green" style="padding:3px 10px;font-size:11px" onclick="startWorker('${w.id}')">Start</button>
-        <button class="btn btn-red"   style="padding:3px 10px;font-size:11px" onclick="stopWorker('${w.id}')">Stop</button>
-        <button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;color:var(--red)" onclick="removeWorker('${w.id}')">✕</button>
-      </div>`;
-    el.appendChild(card);
-  });
-}
-
-function renderAssign() {
-  const tb = document.getElementById('assign-tbody');
-  tb.innerHTML = '';
-  workers.forEach(w => {
-    const pid  = assignments[w.id];
-    const pool = pools.find(p=>p.id===pid);
-    const isErr = w.status?.startsWith('err');
-    const tr   = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="checkbox" class="chk-worker" data-id="${w.id}"></td>
-      <td>${esc(w.rig_id)}</td>
-      <td>${pool ? esc(pool.name) : '<span style="color:var(--yellow)">— unassigned —</span>'}</td>
-      <td class="tag-${w.status==='mining'?'ok':(isErr?'fail':'idle')}">${esc(w.status||'idle')}</td>
-      <td><button class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="quickAssign('${w.id}')">Assign</button></td>`;
-    tb.appendChild(tr);
-  });
-}
-
 function renderSidebar() {
-  document.getElementById('s-pools').textContent   = pools.length;
-  document.getElementById('s-workers').textContent = workers.length;
   const mining  = workers.filter(w=>w.status==='mining').length;
   const totalHs = workers.reduce((a,w)=>a+(w.hashrate||0),0);
-  const totalSh = workers.reduce((a,w)=>a+(w.shares||0),0);
-  const totalEr = workers.reduce((a,w)=>a+(w.errors||0),0);
-  document.getElementById('s-mining').textContent  = mining;
-  document.getElementById('s-hs').textContent      = Math.round(totalHs).toLocaleString();
-  document.getElementById('s-shares').textContent  = totalSh;
-  document.getElementById('s-errors').textContent  = totalEr;
+  document.getElementById('s-acquired').textContent = workers.length;
+  document.getElementById('s-mining').textContent   = mining;
+  document.getElementById('s-hs').textContent       = Math.round(totalHs).toLocaleString();
+  document.getElementById('s-shares').textContent   = workers.reduce((a,w)=>a+(w.shares||0),0);
+  document.getElementById('s-errors').textContent   = workers.reduce((a,w)=>a+(w.errors||0),0);
   const sp = document.getElementById('sidebar-pools');
   sp.innerHTML = '';
   pools.forEach(p => {
-    const tr  = p.test_result || {};
-    const cls = tr.reachable ? 'dot-green' : (tr.hasOwnProperty('reachable') ? 'dot-red' : 'dot-grey');
+    const r   = p.test_result || {};
+    const cls = r.reachable ? 'dot-green' : (r.hasOwnProperty('reachable') ? 'dot-red' : 'dot-grey');
     sp.innerHTML += `<div class="pool-dot"><span class="dot ${cls}">●</span><span>${esc(p.name.slice(0,22))}</span></div>`;
   });
 }
 
-function renderPoolSelects() {
-  ['assign-pool-select','aw-pool'].forEach(id => {
-    const sel = document.getElementById(id);
-    const cur = sel.value;
-    sel.innerHTML = id==='aw-pool' ? '<option value="">— unassigned —</option>' : '';
-    pools.forEach(p => { const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o); });
-    if (cur) sel.value = cur;
+function renderPipeline() {
+  const el = document.getElementById('pipeline-rows');
+  if (!workers.length && !Object.keys(dispatchedRuns).length) return;
+  el.innerHTML = '';
+  workers.forEach(w => {
+    const isErr = (w.status||'').startsWith('err');
+    const stepCls = w.status==='mining'?'ps-mining':(w.status==='connecting'?'ps-connecting':(isErr?'ps-error':'ps-stopped'));
+    const acqTime = w.acquired_at ? `→ online ${fmtAgo(w.acquired_at)}` : '';
+    el.innerHTML += `<div class="pipeline-row">
+      <span class="pipeline-step ${stepCls}">${esc(w.status||'idle')}</span>
+      <span><b>${esc(w.rig_id)}</b></span>
+      <span style="color:var(--fg2)">${esc(w.source||'manual')}</span>
+      <span style="color:var(--accent2)">${acqTime}</span>
+      <span style="color:var(--green);margin-left:auto">${Math.round(w.hashrate||0).toLocaleString()} H/s</span>
+      <span style="color:var(--fg2)">${w.shares||0} shares</span>
+    </div>`;
   });
 }
 
-// Pool actions
+// ── Pool template from GitHub Pages
+async function refreshPoolTemplate() {
+  try {
+    const url = getPoolUrl().replace(/\/$/, '');
+    const r   = await fetch(url + '/template.json', { cache:'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const t = await r.json();
+    document.getElementById('s-coin').textContent   = t.coin   || '—';
+    document.getElementById('s-algo').textContent   = t.algo   || '—';
+    document.getElementById('s-height').textContent = t.height || '—';
+  } catch { /* pool not yet live */ }
+}
+
+// ── Fleet registry from raw GitHub
+async function refreshFleet() {
+  const el = document.getElementById('fleet-registry');
+  el.innerHTML = '<span style="color:var(--fg2)">Loading...</span>';
+  try {
+    const r = await fetch(RAW_BASE + '/fleet/harvest/workers.yaml', { cache:'no-store' });
+    const txt = await r.text();
+    // Parse minimal YAML by hand for meta section
+    const active  = (txt.match(/active_count:\s*(\d+)/)  || [])[1] || '0';
+    const target  = (txt.match(/target_count:\s*(\d+)/)  || [])[1] || '0';
+    const hr      = (txt.match(/total_hashrate_estimate:\s*"?([^"\n]+)"?/) || [])[1] || '0 H/s';
+    const scan    = (txt.match(/last_scan:\s*(.+)/)       || [])[1] || 'never';
+    el.innerHTML = `
+      <table class="bench-table">
+        <tr><td>Active workers</td><td class="tag-ok">${active} / ${target}</td></tr>
+        <tr><td>Total H/s estimate</td><td style="color:var(--green)">${esc(hr)}</td></tr>
+        <tr><td>Last scavenger scan</td><td style="color:var(--fg2)">${esc(scan)}</td></tr>
+      </table>
+      <div style="margin-top:8px">
+        <a href="https://github.com/${GH_REPO}/blob/main/fleet/harvest/workers.yaml" target="_blank" style="font-size:11px">View full registry ↗</a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://github.com/${GH_REPO}/actions/workflows/scavenger.yml" target="_blank" style="font-size:11px">Run scavenger ↗</a>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<span class="tag-fail">Failed to load fleet registry: ${esc(String(e))}</span>`;
+  }
+}
+document.getElementById('btn-refresh-fleet').addEventListener('click', refreshFleet);
+
+// ── Dispatch a real GitHub Actions worker
+async function dispatchWorker() {
+  const pat = getPat();
+  if (!pat) {
+    alert('Enter your GitHub PAT (with workflow scope) in the sidebar Settings first.');
+    return;
+  }
+  const rig      = document.getElementById('acq-rig').value.trim() || 'bench-rig';
+  const duration = parseInt(document.getElementById('acq-duration').value) || 30;
+  const poolUrl  = document.getElementById('acq-pool-url').value.trim() || getPoolUrl();
+
+  // 1. Create a bench_workers row to get an ID
+  const { data: w, error } = await db.from('bench_workers')
+    .insert({ rig_id: rig, user_id: session.user.id, status:'dispatching', source:'github_actions', pool_url: poolUrl })
+    .select().single();
+  if (error || !w) { log('Failed to create worker row: '+(error?.message||'unknown'), 'err'); return; }
+
+  // 2. Dispatch the GitHub Actions workflow
+  const payload = {
+    ref: 'main',
+    inputs: {
+      worker_id:        w.id,
+      pool_url:         poolUrl,
+      rig_id:           rig,
+      duration_minutes: String(duration)
+    }
+  };
+  log(`Dispatching ${rig} via GitHub Actions (${duration}min @ ${poolUrl})...`);
+  try {
+    const r = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WF}/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${pat}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (r.status === 204) {
+      log(`✓ Dispatched ${rig} — worker ID: ${w.id.slice(0,8)}`, 'ok');
+      dispatchedRuns[w.id] = { rig_id: rig, dispatched_at: new Date().toISOString() };
+      renderPipeline();
+      // Start polling for this worker's run
+      setTimeout(() => pollRunStatuses(), 5000);
+    } else {
+      const txt = await r.text();
+      throw new Error(`GitHub API ${r.status}: ${txt.slice(0,120)}`);
+    }
+  } catch(e) {
+    log(`✗ Dispatch failed: ${e.message}`, 'err');
+    await db.from('bench_workers').update({ status:'err:dispatch failed' }).eq('id', w.id);
+  }
+  await loadAll();
+}
+document.getElementById('btn-acquire').addEventListener('click', dispatchWorker);
+
+// ── Poll GitHub Actions run list to update dispatch status
+async function pollRunStatuses() {
+  const pat = getPat();
+  if (!pat || !Object.keys(dispatchedRuns).length) return;
+  try {
+    const r = await fetch(
+      `https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WF}/runs?per_page=10`,
+      { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github+json' } }
+    );
+    if (!r.ok) return;
+    const data = await r.json();
+    const runs = data.workflow_runs || [];
+    runs.forEach(run => {
+      const msg = run.status === 'completed'
+        ? `Run ${run.id}: ${run.conclusion} (${run.name})`
+        : `Run ${run.id}: ${run.status}`;
+      // Status already tracked via Supabase realtime from within the worker
+    });
+  } catch { /* ignore */ }
+}
+
+// ── Pool test
 document.getElementById('btn-add-pool').addEventListener('click', () => openModal('modal-add-pool'));
-document.getElementById('ap-cancel').addEventListener('click',    () => closeModal('modal-add-pool'));
+document.getElementById('ap-cancel').addEventListener('click', () => closeModal('modal-add-pool'));
 document.getElementById('ap-save').addEventListener('click', async () => {
   const url = document.getElementById('ap-url').value.trim();
   if (!url) { alert('URL required'); return; }
@@ -406,13 +591,11 @@ async function removePool(id) {
   await loadAll(); log('Pool removed','warn');
 }
 
-async function testPool(id) { testPoolById(id); }
-
 async function testPoolById(id) {
   if (!id) return;
   const pool = pools.find(p=>p.id===id);
   if (!pool) return;
-  log(`Testing ${pool.name} ...`);
+  log(`Testing ${pool.name}...`);
   const token  = session.access_token;
   const result = { reachable:false, protocol:null, latency_ms:null, coin:null, algo:null, height:null, auth_ok:null, errors:[] };
   try {
@@ -446,151 +629,29 @@ async function testPoolById(id) {
     log(`✗ ${pool.name} unreachable: ${result.errors.join(', ')}`, 'err');
   await loadAll();
 }
-
-async function testAllPools() { for (const p of pools) await testPoolById(p.id); }
-document.getElementById('btn-test-all').addEventListener('click', testAllPools);
-
-// Worker actions
-document.getElementById('btn-add-worker').addEventListener('click', () => openModal('modal-add-worker'));
-document.getElementById('aw-cancel').addEventListener('click', () => closeModal('modal-add-worker'));
-document.getElementById('aw-save').addEventListener('click', async () => {
-  const base  = document.getElementById('aw-rig').value.trim() || 'bench';
-  const count = parseInt(document.getElementById('aw-count').value)||1;
-  const pid   = document.getElementById('aw-pool').value || null;
-  for (let i=0;i<count;i++) {
-    const rig_id = count>1 ? `${base}-${String(i).padStart(2,'0')}` : base;
-    const { data: w } = await db.from('bench_workers').insert({ rig_id, user_id:session.user.id }).select().single();
-    if (pid && w) await db.from('bench_assignments').upsert({ worker_id:w.id, pool_id:pid, user_id:session.user.id }, { onConflict:'worker_id' });
-    log(`Added worker: ${rig_id}`);
-  }
-  closeModal('modal-add-worker');
-  await loadAll();
+document.getElementById('btn-test-all').addEventListener('click', async () => {
+  for (const p of pools) await testPoolById(p.id);
 });
 
+// ── Worker management
 async function removeWorker(id) {
-  stopWorker(id);
   await db.from('bench_workers').delete().eq('id',id);
   await loadAll(); log('Worker removed','warn');
 }
-
-// Assign
-async function quickAssign(workerId) {
-  const pid = document.getElementById('assign-pool-select').value;
-  if (!pid) { alert('Select a target pool first'); return; }
-  await doAssign([workerId], pid);
-}
-document.getElementById('btn-assign-selected').addEventListener('click', async () => {
-  const pid = document.getElementById('assign-pool-select').value;
-  if (!pid) { alert('Select a target pool'); return; }
-  const checked = [...document.querySelectorAll('.chk-worker:checked')].map(c=>c.dataset.id);
-  if (!checked.length) { alert('Select workers first'); return; }
-  await doAssign(checked, pid);
-});
-document.getElementById('btn-assign-all').addEventListener('click', async () => {
-  const pid = document.getElementById('assign-pool-select').value;
-  if (!pid) { alert('Select a target pool'); return; }
-  await doAssign(workers.map(w=>w.id), pid);
-  log(`Assigned ALL workers → ${pools.find(p=>p.id===pid)?.name}`);
-});
-async function doAssign(workerIds, poolId) {
-  for (const wid of workerIds) {
-    await db.from('bench_assignments').upsert({ worker_id:wid, pool_id:poolId, user_id:session.user.id }, { onConflict:'worker_id' });
-    const w=workers.find(w=>w.id===wid); const p=pools.find(p=>p.id===poolId);
-    if(w&&p) log(`Assigned ${w.rig_id} → ${p.name}`);
+document.getElementById('btn-stop-all').addEventListener('click', async () => {
+  if (!confirm('Mark all workers as stopped? (Does not cancel running GitHub Actions jobs)')) return;
+  for (const w of workers) {
+    await db.from('bench_workers').update({status:'stopped',hashrate:0}).eq('id',w.id);
   }
-  await loadAll();
-}
-document.getElementById('chk-all').addEventListener('change', e => {
-  document.querySelectorAll('.chk-worker').forEach(c=>c.checked=e.target.checked);
+  await loadAll(); log('Marked all workers stopped','warn');
 });
 
-// Worker mining loop — hard-fails on any template error, no simulation
-function startWorker(id) {
-  if (activeWorkers[id]) return;
-  const pid  = assignments[id];
-  const pool = pools.find(p=>p.id===pid);
-  if (!pool) { log(`No pool assigned to worker ${id}`,'warn'); return; }
-  const token = session.access_token;
-  activeWorkers[id] = { stop:false };
-
-  const workerCode = `
-    const relay   = '${RELAY}';
-    const poolUrl = '${pool.url}';
-    const token   = '${token}';
-    const wid     = '${id}';
-    const supaUrl = '${SUPA_URL}';
-    const supaKey = '${SUPA_KEY}';
-    let nonce=0, shares=0, errors=0, start=Date.now(), stop=false;
-
-    async function updateDB(status, hashrate, sh, er) {
-      await fetch(supaUrl+'/rest/v1/bench_workers?id=eq.'+wid, {
-        method:'PATCH',
-        headers:{ 'apikey':supaKey,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal' },
-        body: JSON.stringify({ status, hashrate, shares:sh, errors:er })
-      });
-    }
-
-    async function run() {
-      await updateDB('connecting',0,0,0);
-      let tmpl;
-      try {
-        const r = await fetch(relay+'/template.json', {
-          headers:{ 'Authorization':'Bearer '+token, 'x-bench-target':poolUrl },
-          signal: AbortSignal.timeout(8000)
-        });
-        if (!r.ok) throw new Error('template '+r.status);
-        tmpl = await r.json();
-      } catch(e) {
-        const msg = 'err:'+String(e.message||e).replace('Error:','').trim().slice(0,40);
-        await updateDB(msg, 0, 0, 1);
-        self.postMessage({ type:'error', reason: msg });
-        return;
-      }
-      await updateDB('mining',0,0,0);
-      start = Date.now();
-      while (!stop) {
-        for (let i=0;i<2000;i++) nonce++;
-        if (nonce % 50000 < 2000) shares++;
-        const elapsed = (Date.now()-start)/1000 || 0.001;
-        await updateDB('mining', Math.round(nonce/elapsed), shares, errors);
-        await new Promise(r=>setTimeout(r,50));
-      }
-      await updateDB('stopped',0,shares,errors);
-    }
-
-    self.onmessage = e => { if (e.data==='stop') stop=true; };
-    run();
-  `;
-
-  const blob = new Blob([workerCode], { type:'application/javascript' });
-  const bw   = new Worker(URL.createObjectURL(blob));
-  bw.onmessage = e => {
-    if (e.data?.type==='error') {
-      log(`✗ ${workers.find(w=>w.id===id)?.rig_id}: ${e.data.reason}`, 'err');
-      delete activeWorkers[id];
-    }
-  };
-  activeWorkers[id].worker = bw;
-  log(`Started ${workers.find(w=>w.id===id)?.rig_id} → ${pool.name}`);
-}
-
-function stopWorker(id) {
-  const aw = activeWorkers[id];
-  if (!aw) return;
-  aw.stop=true;
-  if (aw.worker) aw.worker.postMessage('stop');
-  delete activeWorkers[id];
-  db.from('bench_workers').update({status:'stopped'}).eq('id',id);
-  log(`Stopped ${workers.find(w=>w.id===id)?.rig_id||id}`,'warn');
-}
-
-document.getElementById('btn-start-all').addEventListener('click', () => workers.forEach(w=>startWorker(w.id)));
-document.getElementById('btn-stop-all').addEventListener('click',  () => Object.keys(activeWorkers).forEach(stopWorker));
-
-// Log
+// ── Log
 async function log(msg, level='info') {
   appendLog({ level, message:msg, created_at:new Date().toISOString() });
-  await db.from('bench_log').insert({ message:msg, level, user_id:session.user.id });
+  try {
+    await db.from('bench_log').insert({ message:msg, level, user_id:session.user.id });
+  } catch { /* non-fatal */ }
   document.getElementById('status-msg').textContent = msg.slice(0,100);
 }
 function appendLog(row) {
@@ -602,7 +663,7 @@ function appendLog(row) {
 }
 document.getElementById('btn-clear-log').addEventListener('click', () => { document.getElementById('log-panel').innerHTML=''; });
 
-// Tabs
+// ── Tabs
 document.querySelectorAll('.tab').forEach(t => {
   t.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -612,19 +673,31 @@ document.querySelectorAll('.tab').forEach(t => {
   });
 });
 
-// Modals
+// ── Modals
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); });
 });
 
-// Clock
+// ── Clock
 function startClock() {
   setInterval(() => { document.getElementById('status-clock').textContent = new Date().toLocaleString(); }, 1000);
 }
 
+// ── Helpers
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtUptime(s) {
+  if (s < 60)  return s+'s';
+  if (s < 3600) return Math.floor(s/60)+'m '+( s%60)+'s';
+  return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m';
+}
+function fmtAgo(iso) {
+  const s = Math.round((Date.now() - new Date(iso)) / 1000);
+  if (s < 60)   return s+'s ago';
+  if (s < 3600) return Math.floor(s/60)+'m ago';
+  return Math.floor(s/3600)+'h ago';
+}
 
 init();
 </script>
