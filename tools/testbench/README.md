@@ -1,60 +1,61 @@
 # GitMine Pool Test Bench
 
-A standalone TUI console for testing mining pools, managing bench workers,
-and assigning workers to pools — **completely isolated from the main pool/miner code**.
+Two interfaces — both read/write the same `state.json`:
 
-## Install & Run
+| Interface | File | Requirements |
+|---|---|---|
+| **Tkinter GUI** (desktop) | `gui.py` | `pip install requests` (stdlib only) |
+| **Textual TUI** (terminal) | `testbench.py` | `pip install rich textual requests` |
+
+## Quick Start (GUI)
 
 ```bash
 cd tools/testbench
-pip install -r requirements.txt
+pip install requests
+python gui.py
+```
+
+## Quick Start (TUI)
+
+```bash
+cd tools/testbench
+pip install rich textual requests
 python testbench.py
 ```
 
-## Features
+## GUI Features
 
-| Feature | Description |
-|---|---|
-| **Add pools** | Name, URL, username, password, coin |
-| **Test pools** | Connectivity, latency, protocol detection, auth check |
-| **Add workers** | Auto-generates a bench rig ID |
-| **Assign** | Assign individual workers or ALL workers to any pool |
-| **Live mining sim** | Workers actually fetch templates and hash against the pool |
-| **Share submission** | Test shares are submitted to the pool's `/submit` endpoint |
-| **Live stats** | Hashrate, shares found, errors, per-worker and aggregate |
-| **Persistent state** | All pools/workers/assignments saved to `state.json` |
-
-## Keyboard Shortcuts
-
-| Key | Action |
-|---|---|
-| `P` | Add a new pool |
-| `W` | Add a bench worker |
-| `T` | Test all pools |
-| `R` | Refresh tables |
-| `Q` | Quit |
-
-## Tabs
-
-- **Pools** — All configured pools with live test results
-- **Workers** — All bench workers with hashrate + share counts
-- **Assign** — Assign individual workers to pools, or assign all at once
-- **Log** — Live event log
+- Dark themed desktop window (1200x750, resizable)
+- **Top bar** — Add Pool, Add Worker, Test All, Start All, Stop All
+- **Sidebar** — live aggregate stats + coloured pool health dots
+- **Pools tab** — all pools with reachability, protocol, height, latency, auth result
+- **Workers tab** — all workers with status, assigned pool, H/s, shares, errors
+- **Assign tab** — select workers, pick target pool from dropdown, assign individually or all at once
+- **Log tab** — colour-coded event log (green=ok, red=err, yellow=warn)
+- Right-click context menus on pool and worker rows
+- Auto-refresh every 3 seconds
+- All state persisted to `state.json`
 
 ## Adding Multiple Pools
 
-Press `P` (or click `+ Add Pool`) for each pool. You can add as many as needed:
+Click **+ Pool** for each pool. Fields:
+- Pool Name (label)
+- Pool URL
+- Username / Address
+- Password
+- Coin (default: FNNC)
 
-```
-Pool 1: https://pool-a.example.com  user=myaddress  pass=x
-Pool 2: https://pool-b.example.com  user=myaddress  pass=x
-Pool 3: https://testnet.example.com user=testaddr   pass=x
-```
+## Assigning Workers
 
-Then go to the **Assign** tab, select a worker row, type a pool name or ID,
-and click **Assign Selected** — or click **Assign ALL** to send every worker
-to the same pool.
+1. Go to **Assign** tab
+2. Select one or more worker rows (Ctrl+click for multi)
+3. Pick target pool from the dropdown
+4. Click **Assign Selected** — or click **Assign ALL →** to route everything
 
-## State File
+## Running Bench Workers
 
-All state is saved to `tools/testbench/state.json`. Delete it to reset.
+- Right-click a worker → **Start Worker**
+- Or click **Start All** in the top bar
+- Workers fetch a real template from the pool and mine against it
+- Test shares are submitted to `/submit`
+- Click **Stop All** or right-click → **Stop Worker** to halt
