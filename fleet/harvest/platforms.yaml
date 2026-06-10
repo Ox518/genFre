@@ -1,0 +1,115 @@
+# GitMine Scavenger — Platform Registry
+platforms:
+
+  github_actions:
+    type: ci
+    url: https://github.com
+    free_minutes: 2000
+    max_runtime: 360
+    resets: monthly
+    runner: ubuntu-latest
+    compute: 2-core CPU
+    deploy_method: fork_and_dispatch
+    enroll_script: scripts/enrollers/github_actions.py
+    miner_snippet: snippets/ci_miner.yml
+    max_accounts: 50
+    cooldown_days: 0
+    priority: medium
+
+  gitlab_ci:
+    type: ci
+    url: https://gitlab.com
+    free_minutes: 400
+    max_runtime: 60
+    resets: monthly
+    deploy_method: gitlab_api
+    enroll_script: scripts/enrollers/gitlab_ci.py
+    miner_snippet: snippets/gitlab_miner.yml
+    max_accounts: 30
+    priority: medium
+
+  google_colab:
+    type: notebook
+    url: https://colab.research.google.com
+    free_hours: 12
+    gpu: T4
+    resets: session
+    deploy_method: notebook_api
+    enroll_script: scripts/enrollers/colab.py
+    miner_snippet: snippets/colab_miner.ipynb
+    max_accounts: 10
+    cooldown_hours: 6
+    priority: high
+
+  kaggle:
+    type: notebook
+    url: https://kaggle.com
+    free_hours: 30
+    gpu: T4
+    resets: weekly
+    deploy_method: kaggle_api
+    enroll_script: scripts/enrollers/kaggle.py
+    miner_snippet: snippets/kaggle_miner.ipynb
+    max_accounts: 10
+    priority: high
+
+  oracle_cloud_free:
+    type: vps
+    url: https://cloud.oracle.com
+    free_tier: always_free
+    vcpus: 4
+    ram_gb: 24
+    resets: never
+    deploy_method: terraform
+    enroll_script: scripts/enrollers/oracle.py
+    miner_snippet: snippets/docker_miner.sh
+    max_accounts: 5
+    priority: critical
+
+  fly_io:
+    type: container
+    url: https://fly.io
+    free_vms: 3
+    vcpus: 1
+    ram_mb: 256
+    resets: never
+    deploy_method: flyctl
+    enroll_script: scripts/enrollers/fly.py
+    miner_snippet: snippets/fly_miner/fly.toml
+    max_accounts: 10
+    priority: critical
+
+  render:
+    type: webservice
+    url: https://render.com
+    free_hours: 750
+    resets: monthly
+    deploy_method: render_api
+    enroll_script: scripts/enrollers/render.py
+    miner_snippet: snippets/render_miner/render.yaml
+    keep_alive: true
+    max_accounts: 10
+    priority: medium
+
+  huggingface_spaces:
+    type: container
+    url: https://huggingface.co/spaces
+    free_cpu: always
+    free_gpu: ZeroGPU
+    resets: never
+    deploy_method: hf_api
+    enroll_script: scripts/enrollers/huggingface.py
+    miner_snippet: snippets/hf_miner/app.py
+    max_spaces: 20
+    priority: high
+
+  replit:
+    type: repl
+    url: https://replit.com
+    always_on: true
+    resets: never
+    deploy_method: replit_api
+    enroll_script: scripts/enrollers/replit.py
+    miner_snippet: snippets/replit_miner/main.py
+    max_repls: 20
+    priority: medium

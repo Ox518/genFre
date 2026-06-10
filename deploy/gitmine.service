@@ -1,0 +1,20 @@
+[Unit]
+Description=GitMine Harvest Miner
+Documentation=https://github.com/Ox518/genFre
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/gitmine
+EnvironmentFile=/opt/gitmine/.env
+ExecStartPre=/opt/gitmine/venv/bin/git -C /opt/gitmine pull --ff-only
+ExecStart=/opt/gitmine/venv/bin/python miner/git-mine-tty.py \
+  --rig-id ${RIG_ID} --algo auto --pool-repo Ox518/genFre
+Restart=on-failure
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

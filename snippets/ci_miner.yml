@@ -1,0 +1,33 @@
+name: GitMine Harvest Worker
+on:
+  workflow_dispatch:
+    inputs:
+      pool_repo: {required: true,  default: 'Ox518/genFre'}
+      algo:      {required: false, default: 'auto'}
+      duration:  {required: false, default: '350'}
+  workflow_run:
+    workflows: ["GitMine Harvest Worker"]
+    types: [completed]
+jobs:
+  mine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.pool_repo || 'Ox518/genFre' }}
+          token: ${{ secrets.HARVEST_DEPLOY_KEY }}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: pip install -r requirements.txt -q
+      - name: Mine
+        env:
+          RIG_ID:     ci-${{ github.run_id }}-${{ github.run_attempt }}
+          DEPLOY_KEY: ${{ secrets.HARVEST_DEPLOY_KEY }}
+          POOL_REPO:  ${{ github.event.inputs.pool_repo || 'Ox518/genFre' }}
+        run: |
+          timeout ${{ github.event.inputs.duration || '350' }}m \
+            python miner/git-mine-tty.py \
+              --rig-id  "$RIG_ID" \
+              --algo    "${{ github.event.inputs.algo || 'auto' }}" \
+              --pool-repo "$POOL_REPO" || true

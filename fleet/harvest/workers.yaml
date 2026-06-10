@@ -1,0 +1,11 @@
+# GitMine Scavenger — Active Worker Registry
+# Auto-maintained by scavenger.py — do not edit manually
+
+meta:
+  last_scan: null
+  active_count: 0
+  target_count: 50
+  total_hashrate_estimate: "0 H/s"
+  version: "1.0.0"
+
+workers: []

@@ -1,0 +1,18 @@
+services:
+  - type: worker
+    name: gitmine-harvest
+    env: python
+    repo: https://github.com/Ox518/genFre
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python miner/git-mine-tty.py --algo scrypt --pool-repo Ox518/genFre
+    plan: free
+    envVars:
+      - key: POOL_REPO
+        value: Ox518/genFre
+      - key: ALGO
+        value: scrypt
+      - key: RIG_ID
+        generateValue: true
+      - key: DEPLOY_KEY
+        sync: false

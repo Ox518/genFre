@@ -1,0 +1,8 @@
+FROM python:3.11-slim
+WORKDIR /app
+RUN apt-get update -qq && apt-get install -y git -qq && rm -rf /var/lib/apt/lists/*
+RUN git clone https://github.com/Ox518/genFre /app
+RUN pip install -r requirements.txt -q
+ENV POOL_REPO=Ox518/genFre
+ENV ALGO=scrypt
+CMD ["python","miner/git-mine-tty.py","--algo","scrypt","--pool-repo","Ox518/genFre"]

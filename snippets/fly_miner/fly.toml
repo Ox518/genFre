@@ -1,0 +1,11 @@
+app = "gitmine-harvest"
+primary_region = "ord"
+[build]
+  dockerfile = "Dockerfile.miner"
+[env]
+  POOL_REPO = "Ox518/genFre"
+  ALGO      = "scrypt"
+[[vm]]
+  memory   = '256mb'
+  cpu_kind = 'shared'
+  cpus     = 1

