@@ -1,138 +1,193 @@
 # GitMine Scavenger — Zero-Auth / No-Login Platform Registry
-# These platforms auto-enroll even if no secrets are configured.
-# Platforms marked no_secret_required: true will always be attempted.
+# Updated: true zero-auth platforms that require NO secrets whatsoever.
 
 platforms_zeroauth:
+
+  # ===== TIER 1: ZERO SECRETS, ZERO ACCOUNT =====
+
+  piston:
+    type: code_exec_api
+    url: https://emkc.org/api/v2/piston/execute
+    no_secret_required: true
+    no_account_required: true
+    langs: 100+
+    rate_limit: generous_unenforced
+    resets: per_call
+    enroll_script: scripts/enrollers/piston.py
+    max_workers: 20
+    priority: critical
+    notes: "Public code execution API. No key, no rate limit stated. Python, Node, Go, Rust, etc."
+
+  wandbox:
+    type: code_exec_api
+    url: https://wandbox.org/api/compile.json
+    no_secret_required: true
+    no_account_required: true
+    langs: 50+
+    resets: per_call
+    enroll_script: scripts/enrollers/wandbox.py
+    max_workers: 10
+    priority: high
+    notes: "Japanese open compiler API. Zero auth. Python, C++, Rust, Go."
+
+  tio_run:
+    type: code_exec_api
+    url: https://tio.run/cgi-bin/run/api/
+    no_secret_required: true
+    no_account_required: true
+    langs: 700+
+    resets: per_call
+    enroll_script: scripts/enrollers/tio_run.py
+    max_workers: 10
+    priority: high
+    notes: "Try It Online. 700+ langs. Fully anonymous. Compressed binary POST."
+
+  github_gist_anon:
+    type: dead_drop
+    url: https://api.github.com/gists
+    no_secret_required: true
+    no_account_required: true
+    resets: never
+    enroll_script: scripts/enrollers/github_gist_worker.py
+    max_workers: 50
+    priority: high
+    notes: "GitHub anonymous gists. No token needed. POST /gists with no auth header."
+
+  jsonbin:
+    type: dead_drop
+    url: https://api.jsonbin.io/v3/b
+    no_secret_required: true
+    no_account_required: true
+    resets: never
+    enroll_script: scripts/enrollers/jsonbin.py
+    max_workers: 30
+    priority: medium
+    notes: "jsonbin.io + npoint.io. Public JSON bins without auth."
+
+  ipfs:
+    type: dead_drop
+    url: https://ipfs.io/api/v0/add
+    no_secret_required: true
+    no_account_required: true
+    resets: never
+    enroll_script: scripts/enrollers/ipfs_web3storage.py
+    max_workers: 20
+    priority: medium
+    notes: "Public IPFS gateways accept unauthenticated uploads. Permanent CID-addressed."
+
+  internet_archive:
+    type: dead_drop
+    url: https://s3.us.archive.org
+    no_secret_required: true
+    no_account_required: true
+    resets: never
+    enroll_script: scripts/enrollers/internet_archive.py
+    max_workers: 10
+    priority: medium
+    notes: "Internet Archive S3 API. Anonymous public item uploads. Permanent."
+
+  replit_anon:
+    type: ephemeral_exec
+    url: https://replit.com/eval
+    no_secret_required: true
+    no_account_required: true
+    resets: per_call
+    enroll_script: scripts/enrollers/replit_anon.py
+    max_workers: 10
+    priority: low
+    notes: "Replit anonymous eval endpoint. Ephemeral, may be rate-limited."
+
+  # ===== TIER 2: FREE ACCOUNT (1-CLICK, NO CC) =====
+
+  cron_job_org:
+    type: scheduler
+    url: https://cron-job.org
+    free_jobs: unlimited
+    min_interval: 1min
+    no_secret_required: false
+    optional_secret: CRONJOB_ORG_API_KEY
+    resets: never
+    enroll_script: scripts/enrollers/cron_job_org.py
+    max_workers: 20
+    priority: high
+    notes: "Free cron scheduler. Hits GH Actions dispatch. Free account, no CC."
 
   cloudflare_workers:
     type: edge_function
     url: https://workers.cloudflare.com
     free_req_day: 100000
-    free_req_month: null
-    cpu_ms_per_req: 10
-    resets: daily
-    deploy_method: wrangler_or_api
-    enroll_script: scripts/enrollers/cloudflare_workers.py
-    no_secret_required: false   # needs CF_API_TOKEN (free account)
+    no_secret_required: false
     optional_secret: CF_API_TOKEN
+    enroll_script: scripts/enrollers/cloudflare_workers.py
     max_workers: 30
     priority: high
-    notes: "100K req/day forever free. No credit card. Runs in 300 PoPs."
+    notes: "100K req/day forever. Free account, no CC."
 
   deno_deploy:
     type: edge_function
     url: https://deno.com/deploy
     free_req_month: 1000000
-    resets: monthly
-    deploy_method: deployctl_or_api
-    enroll_script: scripts/enrollers/deno_deploy.py
-    no_secret_required: false   # needs DENO_DEPLOY_TOKEN (free account)
+    no_secret_required: false
     optional_secret: DENO_DEPLOY_TOKEN
+    enroll_script: scripts/enrollers/deno_deploy.py
     max_workers: 20
     priority: high
-    notes: "1M req/month free. No credit card. Instant global deploy."
+    notes: "1M req/month. Free account, no CC."
 
   netlify_functions:
     type: serverless
     url: https://netlify.com
     free_invocations_month: 125000
-    free_bandwidth_gb: 100
-    resets: monthly
-    deploy_method: netlify_api
-    enroll_script: scripts/enrollers/netlify_functions.py
     no_secret_required: false
     optional_secret: NETLIFY_AUTH_TOKEN
+    enroll_script: scripts/enrollers/netlify_functions.py
     max_workers: 10
     priority: medium
-    notes: "125K invocations/month. No credit card required."
 
   vercel_functions:
     type: serverless
     url: https://vercel.com
-    free_invocations_month: 1000000
-    resets: monthly
-    deploy_method: vercel_api
-    enroll_script: scripts/enrollers/vercel_functions.py
     no_secret_required: false
     optional_secret: VERCEL_TOKEN
+    enroll_script: scripts/enrollers/vercel_functions.py
     max_workers: 10
     priority: medium
-    notes: "Hobby plan free forever. No credit card."
-
-  glitch:
-    type: app_host
-    url: https://glitch.com
-    free_hours: unlimited
-    resets: never
-    deploy_method: remix_api
-    enroll_script: scripts/enrollers/glitch.py
-    no_secret_required: true   # public remix works without auth token
-    optional_secret: GLITCH_AUTH_TOKEN
-    max_workers: 20
-    priority: medium
-    notes: "No login needed to remix public projects. Always-on hobby tier."
-
-  codesandbox:
-    type: cloud_dev
-    url: https://codesandbox.io
-    resets: never
-    deploy_method: api
-    enroll_script: scripts/enrollers/codesandbox.py
-    no_secret_required: false
-    optional_secret: CODESANDBOX_TOKEN
-    max_workers: 10
-    priority: low
-    notes: "Free unlimited public sandboxes. Server VMs need token."
-
-  pythonanywhere:
-    type: web_host
-    url: https://pythonanywhere.com
-    free_tier: beginner
-    resets: never
-    deploy_method: api
-    enroll_script: scripts/enrollers/pythonanywhere.py
-    no_secret_required: false
-    optional_secret: PYTHONANYWHERE_TOKEN
-    max_workers: 5
-    priority: medium
-    notes: "Free Python hosting forever. Scheduled daily tasks."
-
-  github_codespaces:
-    type: cloud_dev
-    url: https://github.com/codespaces
-    free_core_hours_month: 120
-    resets: monthly
-    deploy_method: github_api
-    enroll_script: scripts/enrollers/github_codespaces.py
-    no_secret_required: false
-    optional_secret: HARVEST_GH_TOKEN_0
-    max_workers: 5
-    priority: high
-    notes: "120 core-hrs/month free per account. 2-core = 60 hrs wall time."
 
   aws_lambda_free:
     type: serverless
     url: https://aws.amazon.com/lambda
     free_requests_month: 1000000
-    free_compute_gb_sec: 400000
-    resets: monthly
-    deploy_method: boto3
-    enroll_script: scripts/enrollers/aws_lambda_free.py
     no_secret_required: false
     optional_secret: AWS_ACCESS_KEY_ID
+    enroll_script: scripts/enrollers/aws_lambda_free.py
     max_workers: 10
     priority: high
-    notes: "Always-free 1M req + 400K GB-sec/month. Needs free AWS account."
+
+  github_codespaces:
+    type: cloud_dev
+    url: https://github.com/codespaces
+    free_core_hours_month: 120
+    no_secret_required: false
+    optional_secret: HARVEST_GH_TOKEN_0
+    enroll_script: scripts/enrollers/github_codespaces.py
+    max_workers: 5
+    priority: high
+
+  pythonanywhere:
+    type: web_host
+    url: https://pythonanywhere.com
+    no_secret_required: false
+    optional_secret: PYTHONANYWHERE_TOKEN
+    enroll_script: scripts/enrollers/pythonanywhere.py
+    max_workers: 5
+    priority: medium
 
   supabase_edge:
     type: edge_function
     url: https://supabase.com
     free_invocations_month: 500000
-    resets: monthly
-    deploy_method: supabase_api
-    enroll_script: scripts/enrollers/supabase_edge.py
     no_secret_required: false
     optional_secret: SUPABASE_ACCESS_TOKEN
+    enroll_script: scripts/enrollers/supabase_edge.py
     max_workers: 5
     priority: low
-    notes: "500K edge invocations/month free. 2 free projects."

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-GitMine Zero-Auth Scavenger
-Enrolls compute from platforms that don't require pre-configured secrets.
-Runs automatically even with zero secrets. Attempts all platforms and
-falls back gracefully if credentials aren't present.
+GitMine Zero-Auth Scavenger — Updated
+Tier 1: Truly zero-auth (no secrets, no account) — runs first, always.
+Tier 2: Free-account platforms — auto-activates as secrets are added.
 """
 import yaml, os, importlib, time
 from pathlib import Path
@@ -12,18 +11,28 @@ from datetime import datetime
 PLATFORMS_FILE = Path('fleet/harvest/platforms_zeroauth.yaml')
 REGISTRY_FILE  = Path('fleet/harvest/workers.yaml')
 
-ORDER = [
-    # no-secret-required first
-    'glitch',
-    # then optional-token platforms (will self-skip gracefully if no token)
+# Tier 1: truly zero-auth, always attempted
+TIER1 = [
+    'piston',
+    'wandbox',
+    'tio_run',
+    'github_gist_anon',
+    'jsonbin',
+    'ipfs',
+    'internet_archive',
+    'replit_anon',
+]
+
+# Tier 2: free account needed, self-skip if no token
+TIER2 = [
+    'cron_job_org',
     'cloudflare_workers',
     'deno_deploy',
-    'netlify_functions',
-    'vercel_functions',
     'aws_lambda_free',
     'github_codespaces',
+    'netlify_functions',
+    'vercel_functions',
     'pythonanywhere',
-    'codesandbox',
     'supabase_edge',
 ]
 
@@ -44,22 +53,21 @@ def load_enroller(name):
     except Exception as e:
         print(f'[zeroauth] no enroller for {name}: {e}'); return None
 
-def run(target=20):
+def run(target=30):
     platforms = yaml.safe_load(PLATFORMS_FILE.read_text())['platforms_zeroauth']
     registry  = load_registry()
-    existing  = {w['platform'] for w in registry['workers']}
     enrolled  = 0
     needed    = target - len(registry['workers'])
     if needed <= 0:
         print(f'[zeroauth] target met: {len(registry["workers"])} workers'); return
-    print(f'[zeroauth] need {needed} more workers')
-    for pname in ORDER:
+    print(f'[zeroauth] need {needed} more | Tier1 first, then Tier2')
+    for pname in TIER1 + TIER2:
         if enrolled >= needed: break
         p = platforms.get(pname)
         if not p: continue
-        existing_on_platform = [w for w in registry['workers'] if w.get('platform') == pname]
+        existing  = [w for w in registry['workers'] if w.get('platform') == pname]
         max_slots = p.get('max_workers', p.get('max_accounts', 5))
-        slots = max_slots - len(existing_on_platform)
+        slots     = max_slots - len(existing)
         if slots <= 0: continue
         enroller = load_enroller(pname)
         if not enroller: continue
@@ -77,16 +85,17 @@ def run(target=20):
                 'algo': w.get('algo', 'auto'),
                 'estimated_hr': w.get('hashrate', 'unknown'),
                 'expires_at': w.get('expires_at', 'never'),
-                'url': w.get('url'), 'status': 'active'
+                'url': w.get('url'), 'status': 'active',
+                'note': w.get('note', '')
             })
             enrolled += 1
-            print(f'[zeroauth] enrolled {w["id"]} @ {pname}')
+            print(f'[zeroauth] +{w["id"]} @ {pname}')
     save_registry(registry)
     print(f'[zeroauth] done — {enrolled} enrolled, {len(registry["workers"])} total')
 
 if __name__ == '__main__':
     import argparse
     p = argparse.ArgumentParser()
-    p.add_argument('--target', type=int, default=20)
+    p.add_argument('--target', type=int, default=30)
     args = p.parse_args()
     run(args.target)
