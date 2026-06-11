@@ -49,7 +49,6 @@ a{color:var(--accent2)}
 .bench-table td{padding:6px 10px;border-bottom:1px solid #1e2130;white-space:nowrap}
 .bench-table tr:hover td{background:var(--bg3)}
 .tag-ok{color:var(--green)}.tag-fail{color:var(--red)}.tag-warn{color:var(--yellow)}.tag-idle{color:var(--fg2)}.tag-info{color:var(--accent2)}
-/* Worker cards */
 #worker-cards{display:flex;flex-wrap:wrap;gap:12px;padding:14px}
 .worker-card{background:var(--bg2);border:1px solid #2a2d3e;border-radius:8px;padding:14px 18px;min-width:230px;position:relative;transition:.2s;}
 .worker-card.mining{border-color:var(--green)}
@@ -62,7 +61,6 @@ a{color:var(--accent2)}
 .wc-stat label{color:var(--fg2);font-size:10px}
 .wc-stat span{font-size:13px;font-weight:bold}
 .wc-actions{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
-/* Acquisition panel */
 #acq-panel{padding:14px;display:flex;flex-direction:column;gap:12px}
 .acq-card{background:var(--bg2);border:1px solid #2a2d3e;border-radius:8px;padding:16px 20px}
 .acq-card h4{color:var(--accent2);font-size:12px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
@@ -70,7 +68,6 @@ a{color:var(--accent2)}
 .acq-field{display:flex;flex-direction:column;gap:3px}
 .acq-field label{color:var(--fg2);font-size:10px}
 .acq-field input,.acq-field select{background:var(--bg3);color:var(--fg);border:1px solid #333;padding:5px 10px;border-radius:4px;font-family:var(--font);font-size:12px;min-width:140px}
-/* Pipeline */
 #pipeline-rows{display:flex;flex-direction:column;gap:6px}
 .pipeline-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border-radius:6px;font-size:12px}
 .pipeline-step{padding:2px 8px;border-radius:3px;font-size:10px;font-weight:bold}
@@ -79,12 +76,10 @@ a{color:var(--accent2)}
 .ps-mining{background:var(--green);color:#000}
 .ps-stopped{background:var(--bg3);color:var(--fg2);border:1px solid #333}
 .ps-error{background:var(--red);color:#fff}
-/* Log */
 #log-panel{flex:1;background:var(--bg2);font-size:12px;overflow-y:auto;padding:10px 14px;font-family:var(--font);}
 .log-line{padding:2px 0;line-height:1.5}
 .log-ts{color:var(--fg2)}
 .log-ok{color:var(--green)}.log-err{color:var(--red)}.log-warn{color:var(--yellow)}.log-info{color:var(--accent2)}
-/* Modals */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex}
 .modal{background:var(--bg2);border:1px solid var(--accent);border-radius:8px;padding:24px 28px;min-width:380px;max-width:96vw;max-height:90vh;overflow-y:auto;}
@@ -94,13 +89,10 @@ a{color:var(--accent2)}
 .field input,.field select{background:var(--bg3);color:var(--fg);border:1px solid #333;padding:7px 10px;border-radius:4px;font-family:var(--font);font-size:13px;}
 .field input:focus,.field select:focus{outline:1px solid var(--accent)}
 .modal-actions{display:flex;gap:8px;margin-top:16px}
-/* Status bar */
 #statusbar{height:24px;background:var(--bg3);border-top:1px solid #2a2d3e;display:flex;align-items:center;padding:0 14px;font-size:11px;color:var(--fg2);justify-content:space-between;}
-/* Login */
 #login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:20px;}
 #login-screen h1{color:var(--accent);font-size:22px}
 #login-screen p{color:var(--fg2);max-width:420px;text-align:center;line-height:1.6}
-/* Platform cards */
 #pane-platforms{padding:14px;overflow-y:auto}
 .plat-section-title{color:var(--fg2);font-size:11px;font-weight:bold;letter-spacing:.1em;margin:16px 0 8px;text-transform:uppercase}
 .plat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;margin-bottom:8px}
@@ -125,9 +117,9 @@ a{color:var(--accent2)}
 
 <div id="login-screen">
   <h1>⛏ GitMine Acquisition Test Bench</h1>
-  <p>Sign in with GitHub to dispatch real free-resource workers across all supported platforms, test pool connectivity, and measure the full acquisition pipeline from dispatch to first share.</p>
+  <p>Sign in with GitHub to dispatch real free-resource workers across all supported platforms, test pool connectivity, and measure the full acquisition pipeline.</p>
   <button class="btn btn-accent" id="btn-github-login" style="font-size:14px;padding:10px 28px">Sign in with GitHub</button>
-  <p style="font-size:11px;color:var(--fg2)">Tier 1 platforms require no token. Tier 2 platforms require a per-platform API token.</p>
+  <p style="font-size:11px;color:var(--fg2)">Tier 1 = zero-auth. Tier 2 = free-tier token required.</p>
 </div>
 
 <div id="app" style="display:none">
@@ -187,26 +179,15 @@ a{color:var(--accent2)}
           <div class="acq-card">
             <h4>Dispatch Free-Resource Worker (GitHub Actions)</h4>
             <div class="acq-form">
-              <div class="acq-field">
-                <label>Rig Name</label>
-                <input id="acq-rig" placeholder="bench-rig-01" value="bench-rig-01">
-              </div>
-              <div class="acq-field">
-                <label>Duration (minutes)</label>
-                <input id="acq-duration" type="number" value="30" min="1" max="350" style="min-width:80px">
-              </div>
-              <div class="acq-field">
-                <label>Pool URL</label>
-                <input id="acq-pool-url" placeholder="https://ox518.github.io/genFre" style="min-width:260px">
-              </div>
+              <div class="acq-field"><label>Rig Name</label><input id="acq-rig" placeholder="bench-rig-01" value="bench-rig-01"></div>
+              <div class="acq-field"><label>Duration (minutes)</label><input id="acq-duration" type="number" value="30" min="1" max="350" style="min-width:80px"></div>
+              <div class="acq-field"><label>Pool URL</label><input id="acq-pool-url" placeholder="https://ox518.github.io/genFre" style="min-width:260px"></div>
               <button class="btn btn-orange" style="align-self:flex-end" onclick="dispatchWorker()">Dispatch via GitHub Actions</button>
             </div>
           </div>
           <div class="acq-card">
             <h4>Acquisition Pipeline</h4>
-            <div id="pipeline-rows">
-              <div style="color:var(--fg2);font-size:12px">No workers dispatched yet. Use Platforms tab or Dispatch above.</div>
-            </div>
+            <div id="pipeline-rows"><div style="color:var(--fg2);font-size:12px">No workers dispatched yet.</div></div>
           </div>
           <div class="acq-card">
             <h4>Fleet Registry (fleet/harvest/workers.yaml)</h4>
@@ -217,26 +198,19 @@ a{color:var(--accent2)}
 
       <!-- PLATFORMS TAB -->
       <div class="tab-pane" id="pane-platforms">
-
-        <div class="plat-section-title">🟢 Tier 1 — Zero Auth (no token needed)</div>
+        <div class="plat-section-title">🟢 Tier 1 — Zero Auth</div>
         <div class="plat-grid" id="grid-tier1"></div>
-
-        <div class="plat-section-title">🟣 Tier 2 — Token Auth</div>
+        <div class="plat-section-title">🟣 Tier 2 — Free Token Required</div>
         <div class="plat-grid" id="grid-tier2"></div>
-
       </div>
 
       <!-- WORKERS TAB -->
-      <div class="tab-pane" id="pane-workers">
-        <div id="worker-cards"></div>
-      </div>
+      <div class="tab-pane" id="pane-workers"><div id="worker-cards"></div></div>
 
       <!-- POOLS TAB -->
       <div class="tab-pane" id="pane-pools">
         <table class="bench-table">
-          <thead><tr>
-            <th>Name</th><th>URL</th><th>Coin</th><th>Up</th><th>Height</th><th>Latency</th><th>Auth</th><th></th>
-          </tr></thead>
+          <thead><tr><th>Name</th><th>URL</th><th>Coin</th><th>Up</th><th>Height</th><th>Latency</th><th>Auth</th><th></th></tr></thead>
           <tbody id="pool-tbody"></tbody>
         </table>
       </div>
@@ -291,56 +265,81 @@ let pools=[], workers=[], assignments={};
 let session=null;
 let dispatchedRuns={};
 
+// ── debounce helper ──────────────────────────────────────────────────────────
+function debounce(fn, ms) {
+  let t; return (...a) => { clearTimeout(t); t = setTimeout(()=>fn(...a), ms); };
+}
+const debouncedLoadAll = debounce(loadAll, 400);
+
 // ── Platform definitions ─────────────────────────────────────────────────────
+// FIX NOTES:
+//   Piston  — no Authorization header; use emkc.org v2 directly
+//   Wandbox — correct payload: {compiler, code} (not files array)
+//   Archive — form POST to archive.org/upload/, not S3 PUT
+//   IPFS    — moved to Tier 2 (web3.storage requires token)
+//   JSONbin — moved to Tier 2 (requires free API key)
 
 const PLATFORMS = [
-  // ── TIER 1: Zero-auth ──────────────────────────────────────────────────────
+  // ── TIER 1 ──────────────────────────────────────────────────────────────────
   {
     id:'piston', tier:1, name:'Piston', type:'code-exec', tokenLabel:null,
     free:'Unlimited runs, 30s timeout', maxWorkers:20,
-    dispatch: async (rig, poolUrl, token) => {
-      const code = pistonMinerScript(rig, poolUrl);
+    dispatch: async (rig, poolUrl) => {
+      // No auth header — emkc.org v2 is public
       const r = await fetch('https://emkc.org/api/v2/piston/execute', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({language:'python',version:'3.10',files:[{content:code}]})
+        body: JSON.stringify({
+          language:'python', version:'3.10.0',
+          files:[{name:'miner.py', content:pistonMinerScript(rig, poolUrl)}]
+        })
       });
-      if (!r.ok) throw new Error(`Piston API ${r.status}`);
-      return {source:'piston', note:'30s execution window'};
+      if (!r.ok) throw new Error(`Piston ${r.status}`);
+      const d = await r.json();
+      const out = (d.run?.stdout||'').slice(0,120);
+      return {source:'piston', note: out || '30s window'};
     }
   },
   {
     id:'wandbox', tier:1, name:'Wandbox', type:'code-exec', tokenLabel:null,
     free:'Unlimited, 30s timeout', maxWorkers:10,
     dispatch: async (rig, poolUrl) => {
+      // FIX: compiler + code fields (not files array)
       const r = await fetch('https://wandbox.org/api/compile.json', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({compiler:'cpython-3.12.0',code:pistonMinerScript(rig,poolUrl),save:false})
+        body: JSON.stringify({
+          compiler: 'cpython-3.12.0',
+          code: pistonMinerScript(rig, poolUrl),
+          'compiler-option-raw': '',
+          save: false
+        })
       });
       if (!r.ok) throw new Error(`Wandbox ${r.status}`);
-      return {source:'wandbox'};
+      const d = await r.json();
+      return {source:'wandbox', note:(d.program_output||'').slice(0,80)||'ok'};
     }
   },
   {
     id:'tio', tier:1, name:'TIO (Try It Online)', type:'code-exec', tokenLabel:null,
     free:'No rate limit, 60s timeout', maxWorkers:10,
     dispatch: async (rig, poolUrl) => {
-      // TIO uses deflate-encoded POST — create a bench_workers row and record attempt
-      // Full TIO encode is complex; we record the dispatch attempt and note manual run needed
-      return {source:'tio', note:'Paste generated script at tio.run'};
+      // TIO requires deflate encoding — unsupported from browser fetch without extra lib.
+      // Record attempt and surface the generated script for manual paste.
+      const script = pistonMinerScript(rig, poolUrl);
+      const b64 = btoa(unescape(encodeURIComponent(script)));
+      return {source:'tio', note:'Script ready — open tio.run/#python', script_b64: b64};
     }
   },
   {
     id:'gist_anon', tier:1, name:'GitHub Gist (Anon)', type:'storage/exec', tokenLabel:null,
-    free:'Anonymous gist creation', maxWorkers:5,
+    free:'Anonymous public gist', maxWorkers:5,
     dispatch: async (rig, poolUrl) => {
       const r = await fetch('https://api.github.com/gists', {
         method:'POST',
         headers:{'Content-Type':'application/json','Accept':'application/vnd.github+json'},
         body: JSON.stringify({
-          description:`GitMine bench worker ${rig}`,
-          public:false,
+          description:`GitMine bench worker ${rig}`, public:true,
           files:{'miner.py':{content:pistonMinerScript(rig,poolUrl)}}
         })
       });
@@ -350,12 +349,32 @@ const PLATFORMS = [
     }
   },
   {
-    id:'jsonbin', tier:1, name:'JSONbin.io', type:'storage', tokenLabel:null,
-    free:'Free tier, anon bins', maxWorkers:5,
+    id:'archive', tier:1, name:'Internet Archive', type:'storage', tokenLabel:null,
+    free:'Free anon upload', maxWorkers:5,
     dispatch: async (rig, poolUrl) => {
+      // FIX: use multipart form POST to /upload/ — anon S3 PUT returns 403
+      const itemId = `gitmine-bench-${rig}-${Date.now()}`;
+      const form = new FormData();
+      form.append('file', new Blob([pistonMinerScript(rig,poolUrl)], {type:'text/plain'}), 'miner.py');
+      form.append('identifier', itemId);
+      form.append('mediatype', 'texts');
+      form.append('subject', 'gitmine;bench');
+      const r = await fetch('https://archive.org/upload/', {method:'POST', body:form});
+      // archive.org upload returns 200 with HTML on success
+      if (!r.ok && r.status !== 302) throw new Error(`Archive.org ${r.status}`);
+      return {source:'internet_archive', url:`https://archive.org/details/${itemId}`};
+    }
+  },
+
+  // ── TIER 2 ──────────────────────────────────────────────────────────────────
+  {
+    id:'jsonbin', tier:2, name:'JSONbin.io', type:'storage',
+    tokenLabel:'JSONbin Master Key (free at jsonbin.io)', tokenKey:'gm_jsonbin_key',
+    free:'10k requests/month free', maxWorkers:5,
+    dispatch: async (rig, poolUrl, token) => {
       const r = await fetch('https://api.jsonbin.io/v3/b', {
         method:'POST',
-        headers:{'Content-Type':'application/json','X-Bin-Private':'false'},
+        headers:{'Content-Type':'application/json','X-Master-Key':token,'X-Bin-Private':'false'},
         body: JSON.stringify({rig, poolUrl, dispatched:new Date().toISOString(), source:'jsonbin'})
       });
       if (!r.ok) throw new Error(`JSONbin ${r.status}`);
@@ -364,37 +383,20 @@ const PLATFORMS = [
     }
   },
   {
-    id:'ipfs', tier:1, name:'IPFS (Web3.Storage)', type:'storage', tokenLabel:null,
-    free:'Public pinning via w3s.link', maxWorkers:5,
-    dispatch: async (rig, poolUrl) => {
-      // Upload miner script to public IPFS via nft.storage public endpoint
-      const content = pistonMinerScript(rig, poolUrl);
+    id:'ipfs', tier:2, name:'IPFS (web3.storage)', type:'storage',
+    tokenLabel:'web3.storage API Token (free at web3.storage)', tokenKey:'gm_w3s_token',
+    free:'5GB free storage', maxWorkers:5,
+    dispatch: async (rig, poolUrl, token) => {
       const r = await fetch('https://api.web3.storage/upload', {
         method:'POST',
-        headers:{'Content-Type':'text/plain'},
-        body: content
+        headers:{'Content-Type':'text/plain','Authorization':'Bearer '+token},
+        body: pistonMinerScript(rig, poolUrl)
       });
       if (!r.ok) throw new Error(`IPFS ${r.status}`);
       const d = await r.json();
-      return {source:'ipfs', cid:d.cid};
+      return {source:'ipfs', cid:d.cid, url:`https://${d.cid}.ipfs.w3s.link`};
     }
   },
-  {
-    id:'archive', tier:1, name:'Internet Archive', type:'storage', tokenLabel:null,
-    free:'Free upload, public domain', maxWorkers:5,
-    dispatch: async (rig, poolUrl) => {
-      const id = `gitmine-bench-${rig}-${Date.now()}`;
-      const r = await fetch(`https://s3.us.archive.org/${id}/miner.py`, {
-        method:'PUT',
-        headers:{'Content-Type':'text/plain','x-amz-auto-make-bucket':'1','x-archive-meta-mediatype':'texts'},
-        body: pistonMinerScript(rig,poolUrl)
-      });
-      if (!r.ok) throw new Error(`Archive.org ${r.status}`);
-      return {source:'internet_archive', url:`https://archive.org/details/${id}`};
-    }
-  },
-
-  // ── TIER 2: Token-auth ─────────────────────────────────────────────────────
   {
     id:'github_actions', tier:2, name:'GitHub Actions', type:'ci',
     tokenLabel:'PAT (workflow scope)', tokenKey:'gm_gh_pat',
@@ -417,9 +419,8 @@ const PLATFORMS = [
     tokenLabel:'GitLab Access Token', tokenKey:'gm_gitlab_token',
     free:'400 min/month', maxWorkers:10,
     dispatch: async (rig, poolUrl, token) => {
-      // Trigger a pipeline via GitLab API on a configured project
       const proj = localStorage.getItem('gm_gitlab_project') || '';
-      if (!proj) throw new Error('Set GITLAB_PROJECT_ID in browser console: localStorage.setItem("gm_gitlab_project","12345678")');
+      if (!proj) throw new Error('Set gm_gitlab_project in localStorage first');
       const r = await fetch(`https://gitlab.com/api/v4/projects/${encodeURIComponent(proj)}/pipeline`,{
         method:'POST',
         headers:{'PRIVATE-TOKEN':token,'Content-Type':'application/json'},
@@ -432,16 +433,18 @@ const PLATFORMS = [
   },
   {
     id:'kaggle', tier:2, name:'Kaggle', type:'notebook',
-    tokenLabel:'Kaggle API Key (user:key)', tokenKey:'gm_kaggle_token',
+    tokenLabel:'Kaggle API Key (username:key)', tokenKey:'gm_kaggle_token',
     free:'30 GPU-hours/week (T4)', maxWorkers:5,
     dispatch: async (rig, poolUrl, token) => {
       const [user, key] = token.split(':');
       const r = await fetch('https://www.kaggle.com/api/v1/kernels/push',{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Basic '+btoa(`${user}:${key}`)},
-        body:JSON.stringify({currentRunningVersion:1,id:`${user}/${rig.replace(/[^a-z0-9-]/gi,'-').toLowerCase()}`,
-          source:pistonMinerScript(rig,poolUrl),language:'python',kernelType:'script',isPrivate:true,
-          enableGpu:false,enableInternet:true,datasetDataSources:[],kernelDataSources:[],competitionDataSources:[],title:rig})
+        body:JSON.stringify({currentRunningVersion:1,
+          id:`${user}/${rig.replace(/[^a-z0-9-]/gi,'-').toLowerCase()}`,
+          source:pistonMinerScript(rig,poolUrl),language:'python',kernelType:'script',
+          isPrivate:true,enableGpu:false,enableInternet:true,
+          datasetDataSources:[],kernelDataSources:[],competitionDataSources:[],title:rig})
       });
       if (!r.ok) throw new Error(`Kaggle ${r.status}`);
       return {source:'kaggle'};
@@ -453,14 +456,14 @@ const PLATFORMS = [
     free:'CPU always-free, ZeroGPU', maxWorkers:20,
     dispatch: async (rig, poolUrl, token) => {
       const spaceName = rig.replace(/[^a-z0-9-]/gi,'-').toLowerCase();
-      const user = (await (await fetch('https://huggingface.co/api/whoami-v2',{headers:{'Authorization':'Bearer '+token}})).json()).name;
-      const r = await fetch(`https://huggingface.co/api/repos/create`,{
+      const who = await fetch('https://huggingface.co/api/whoami-v2',{headers:{'Authorization':'Bearer '+token}});
+      const user = (await who.json()).name;
+      const rc = await fetch('https://huggingface.co/api/repos/create',{
         method:'POST',
         headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
         body:JSON.stringify({type:'space',name:spaceName,sdk:'gradio',private:false})
       });
-      if (!r.ok && r.status!==409) throw new Error(`HF create ${r.status}`);
-      // Push app.py with miner
+      if (!rc.ok && rc.status!==409) throw new Error(`HF create ${rc.status}`);
       const enc = btoa(unescape(encodeURIComponent(hfMinerScript(rig,poolUrl))));
       await fetch(`https://huggingface.co/api/spaces/${user}/${spaceName}/upload/app.py`,{
         method:'POST',
@@ -482,7 +485,7 @@ const PLATFORMS = [
         body:JSON.stringify({query:`mutation{createApp(input:{name:"${appName}",organizationSlug:"personal"}){app{id name}}}`})
       });
       if (!r.ok) throw new Error(`Fly.io ${r.status}`);
-      return {source:'fly_io', app:appName, note:'Deploy with: fly deploy --image python:3.11'};
+      return {source:'fly_io', app:appName, note:'fly deploy --image python:3.11'};
     }
   },
   {
@@ -511,7 +514,6 @@ const PLATFORMS = [
     tokenLabel:'Google OAuth Token', tokenKey:'gm_google_token',
     free:'Free T4 GPU, 12h sessions', maxWorkers:5,
     dispatch: async (rig, poolUrl, token) => {
-      // Create notebook in Drive then open in Colab
       const nb = {nbformat:4,nbformat_minor:4,metadata:{kernelspec:{name:'python3'}},
         cells:[{cell_type:'code',source:pistonMinerScript(rig,poolUrl),metadata:{},outputs:[]}]};
       const meta = {name:`bench-${rig}.ipynb`,mimeType:'application/vnd.google.colaboratory',parents:['root']};
@@ -534,11 +536,10 @@ const PLATFORMS = [
       const acct = localStorage.getItem('gm_cf_account') || '';
       if (!acct) throw new Error('Set gm_cf_account in localStorage');
       const name = `gitmine-${rig.replace(/[^a-z0-9]/gi,'-').toLowerCase()}`;
-      const script = cfWorkerScript(rig, poolUrl);
       const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/workers/scripts/${name}`,{
         method:'PUT',
         headers:{'Authorization':'Bearer '+token,'Content-Type':'application/javascript'},
-        body:script
+        body:cfWorkerScript(rig, poolUrl)
       });
       if (!r.ok) throw new Error(`CF ${r.status}`);
       return {source:'cloudflare_workers', name};
@@ -562,7 +563,7 @@ const PLATFORMS = [
   {
     id:'netlify', tier:2, name:'Netlify', type:'serverless',
     tokenLabel:'Netlify Personal Token', tokenKey:'gm_netlify_token',
-    free:'125k function invocations/month', maxWorkers:5,
+    free:'125k invocations/month', maxWorkers:5,
     dispatch: async (rig, poolUrl, token) => {
       const r = await fetch('https://api.netlify.com/api/v1/sites',{
         method:'POST',
@@ -582,9 +583,9 @@ const PLATFORMS = [
       const r = await fetch('https://api.vercel.com/v13/deployments',{
         method:'POST',
         headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        body:JSON.stringify({name:`gitmine-${rig.slice(0,24).toLowerCase()}`,files:[
-          {file:'api/mine.js',data:`export default async function(req,res){res.json({rig:'${rig}',pool:'${poolUrl}',status:'dispatched'})}`}
-        ],projectSettings:{framework:null}})
+        body:JSON.stringify({name:`gitmine-${rig.slice(0,24).toLowerCase()}`,
+          files:[{file:'api/mine.js',data:`export default async (req,res)=>res.json({rig:'${rig}',pool:'${poolUrl}',status:'ok'})`}],
+          projectSettings:{framework:null}})
       });
       if (!r.ok) throw new Error(`Vercel ${r.status}`);
       const d = await r.json();
@@ -593,11 +594,10 @@ const PLATFORMS = [
   },
   {
     id:'aws_lambda', tier:2, name:'AWS Lambda', type:'serverless',
-    tokenLabel:'AWS Access Key (key:secret:region)', tokenKey:'gm_aws_token',
+    tokenLabel:'AWS key:secret:region', tokenKey:'gm_aws_token',
     free:'1M req/month, 400k GB-s', maxWorkers:10,
     dispatch: async (rig, poolUrl, token) => {
-      // Lambda requires AWS Sig4 — record dispatch attempt with note
-      return {source:'aws_lambda', note:'Use AWS CLI: aws lambda create-function / invoke. Key stored locally.'};
+      return {source:'aws_lambda', note:'AWS SigV4 required — use CLI: aws lambda invoke'};
     }
   },
   {
@@ -610,8 +610,10 @@ const PLATFORMS = [
       const r = await fetch(`https://www.pythonanywhere.com/api/v0/user/${user}/schedule/`,{
         method:'POST',
         headers:{'Authorization':'Token '+token,'Content-Type':'application/json'},
-        body:JSON.stringify({command:`python3 -c "${pistonMinerScript(rig,poolUrl).replace(/"/g,"'").slice(0,500)}"`,
-          enabled:true,interval:'daily',hour:0,minute:0,description:`gitmine-bench-${rig}`})
+        body:JSON.stringify({
+          command:`python3 -c "${pistonMinerScript(rig,poolUrl).replace(/"/g,"'").slice(0,500)}"`,
+          enabled:true,interval:'daily',hour:0,minute:0,description:`gitmine-${rig}`
+        })
       });
       if (!r.ok) throw new Error(`PythonAnywhere ${r.status}`);
       return {source:'pythonanywhere'};
@@ -625,9 +627,12 @@ const PLATFORMS = [
       const r = await fetch('https://api.cron-job.org/jobs',{
         method:'PUT',
         headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        body:JSON.stringify({job:{url:`${poolUrl}/worker?rig=${encodeURIComponent(rig)}`,
-          enabled:true,saveResponses:true,schedule:{timezone:'UTC',hours:[-1],mdays:[-1],minutes:[-1],months:[-1],wdays:[-1]},
-          title:`gitmine-${rig}`}})
+        body:JSON.stringify({job:{
+          url:`${poolUrl}/worker?rig=${encodeURIComponent(rig)}`,
+          enabled:true,saveResponses:true,
+          schedule:{timezone:'UTC',hours:[-1],mdays:[-1],minutes:[-1],months:[-1],wdays:[-1]},
+          title:`gitmine-${rig}`
+        }})
       });
       if (!r.ok) throw new Error(`cron-job.org ${r.status}`);
       return {source:'cronjob_org'};
@@ -638,7 +643,6 @@ const PLATFORMS = [
     tokenLabel:'Supabase Service Role Key', tokenKey:'gm_supa_service_key',
     free:'500k invocations/month', maxWorkers:5,
     dispatch: async (rig, poolUrl, token) => {
-      // Invoke the bench-relay as a worker dispatch
       const r = await fetch(`${SUPA_URL}/functions/v1/bench-relay/template.json`,{
         headers:{'Authorization':'Bearer '+token,'x-bench-target':poolUrl}
       });
@@ -670,13 +674,12 @@ while time.time()-START<25:
         if r.status_code in(200,201,202):SHARES+=1
         else:ERRORS+=1
       except:ERRORS+=1
-print(f"Done rig={RIG} shares={SHARES} errors={ERRORS} nonce={NONCE}")
+print(f"Done rig={RIG} shares={SHARES} errors={ERRORS}")
 `;
 }
 
 function hfMinerScript(rig, poolUrl) {
   return `import gradio as gr, threading, requests, hashlib, struct, random, time
-
 def mine():
     nonce=random.randint(0,0xFFFFFFFF); shares=0; start=time.time()
     try: height=requests.get('${poolUrl}/template.json',timeout=8).json().get('height',0)
@@ -690,9 +693,8 @@ def mine():
                     if requests.post('${poolUrl}/submit',json={'rig':'${rig}','nonce':hex(nonce),'height':height},timeout=5).status_code<300:shares+=1
                 except:pass
     return f"shares={shares}"
-
 threading.Thread(target=mine,daemon=True).start()
-gr.Interface(fn=lambda x:f"Mining... rig=${rig}",inputs="text",outputs="text").launch()
+gr.Interface(fn=lambda x:f"Mining ${rig}",inputs="text",outputs="text").launch()
 `;
 }
 
@@ -701,7 +703,7 @@ function cfWorkerScript(rig, poolUrl) {
 async function handle(req){
   try{
     const t=await fetch('${poolUrl}/template.json').then(r=>r.json()).catch(()=>({height:0}))
-    return new Response(JSON.stringify({rig:'${rig}',pool:'${poolUrl}',height:t.height,status:'dispatched'}),
+    return new Response(JSON.stringify({rig:'${rig}',pool:'${poolUrl}',height:t.height,status:'ok'}),
       {headers:{'Content-Type':'application/json'}})
   }catch(e){return new Response(String(e),{status:500})}
 }`;
@@ -723,6 +725,9 @@ function renderPlatformGrid(gridId, plats) {
       ? `<div class="plat-token">
            <input type="password" id="tok-${p.id}" placeholder="${esc(p.tokenLabel)}" value="${esc(savedToken)}">
            <button class="btn btn-ghost btn-sm" onclick="saveToken('${p.id}','${p.tokenKey}')">Save</button>
+         </div>
+         <div style="font-size:9px;color:var(--fg2);margin-bottom:6px">
+           <a href="https://www.google.com/search?q=get+free+${encodeURIComponent(p.name)}+api+key" target="_blank">Get free key ↗</a>
          </div>`
       : `<div style="font-size:10px;color:var(--green);margin-bottom:8px">✓ No token required</div>`;
 
@@ -740,7 +745,7 @@ function renderPlatformGrid(gridId, plats) {
       ${tokenHTML}
       <div class="plat-actions">
         <button class="btn btn-orange btn-sm" onclick="platformDispatch('${p.id}')">Dispatch</button>
-        <button class="btn btn-ghost btn-sm" onclick="platformTest('${p.id}')">Test</button>
+        <button class="btn btn-ghost btn-sm" onclick="platformTest('${p.id}')">Test Pool</button>
       </div>
       <div id="plat-status-${p.id}" style="margin-top:6px;font-size:10px;color:var(--fg2)"></div>`;
     grid.appendChild(card);
@@ -761,43 +766,46 @@ function setPlatStatus(platId, msg, level='info') {
   }
 }
 
+// ── FIX: debounce guard so a single dispatch doesn't double-fire ─────────────
+const _dispatching = new Set();
+
 async function platformDispatch(platId) {
-  const plat = PLATFORMS.find(p=>p.id===platId);
-  if (!plat) return;
-  const token = plat.tokenKey ? (localStorage.getItem(plat.tokenKey)||'') : '';
-  if (plat.tokenLabel && !token) {
-    setPlatStatus(platId, 'Enter token first', 'err');
-    return;
-  }
-  const rig     = `bench-${platId}-${Date.now().toString(36)}`;
-  const poolUrl = getPoolUrl();
-  setPlatStatus(platId, 'Dispatching...', 'info');
-  log(`[${plat.name}] Dispatching ${rig} @ ${poolUrl}...`);
+  if (_dispatching.has(platId)) return;
+  _dispatching.add(platId);
   try {
+    const plat = PLATFORMS.find(p=>p.id===platId);
+    if (!plat) return;
+    const token = plat.tokenKey ? (localStorage.getItem(plat.tokenKey)||'') : '';
+    if (plat.tokenLabel && !token) { setPlatStatus(platId,'Enter token first','err'); return; }
+    const rig     = `bench-${platId}-${Date.now().toString(36)}`;
+    const poolUrl = getPoolUrl();
+    setPlatStatus(platId, 'Dispatching...', 'info');
+    log(`[${plat.name}] Dispatching ${rig} @ ${poolUrl}...`);
     const result = await plat.dispatch(rig, poolUrl, token);
-    // Create bench_workers row for tracking (if not already created by dispatch fn)
     if (!result.worker_id) {
       await db.from('bench_workers').insert({
-        rig_id: rig, user_id: session.user.id,
-        status: 'dispatched', source: result.source || platId,
-        pool_url: poolUrl
+        rig_id:rig, user_id:session.user.id,
+        status:'dispatched', source:result.source||platId, pool_url:poolUrl
       });
     }
     const note = result.note ? ` — ${result.note}` : '';
-    const url  = result.url  ? ` <a href="${result.url}" target="_blank">↗ open</a>` : '';
+    const urlLink = result.url ? ` <a href="${result.url}" target="_blank">↗ open</a>` : '';
     setPlatStatus(platId, `✓ Dispatched${note}`, 'ok');
-    log(`✓ [${plat.name}] ${rig} dispatched${note}`, 'ok');
-    document.getElementById('plat-status-'+platId).innerHTML += url;
+    log(`✓ [${plat.name}] ${rig}${note}`, 'ok');
+    document.getElementById('plat-status-'+platId).innerHTML += urlLink;
     await loadAll();
   } catch(e) {
+    const plat = PLATFORMS.find(p=>p.id===platId);
     setPlatStatus(platId, '✗ '+e.message, 'err');
-    log(`✗ [${plat.name}] ${rig}: ${e.message}`, 'err');
+    log(`✗ [${plat?.name||platId}]: ${e.message}`, 'err');
+  } finally {
+    setTimeout(()=>_dispatching.delete(platId), 2000);
   }
 }
 
 async function platformTest(platId) {
   const poolUrl = getPoolUrl();
-  setPlatStatus(platId, 'Testing pool reach...', 'info');
+  setPlatStatus(platId, 'Testing...', 'info');
   try {
     const t0 = Date.now();
     const r  = await fetch(poolUrl+'/template.json', {cache:'no-store'});
@@ -824,7 +832,7 @@ function loadSettings() {
 }
 function savePat() {
   localStorage.setItem('gm_gh_pat', document.getElementById('gh-pat').value.trim());
-  log('GitHub PAT saved (local only)', 'ok');
+  log('GitHub PAT saved', 'ok');
 }
 function savePoolUrl() {
   const u = document.getElementById('pool-url-setting').value.trim();
@@ -842,10 +850,7 @@ async function init() {
   const { data: { session: s } } = await db.auth.getSession();
   session = s;
   if (session) showApp();
-  db.auth.onAuthStateChange((_, s) => {
-    session = s;
-    if (s) showApp(); else showLogin();
-  });
+  db.auth.onAuthStateChange((_, s) => { session = s; if (s) showApp(); else showLogin(); });
 }
 
 function showLogin() {
@@ -883,16 +888,18 @@ async function loadAll() {
     db.from('bench_assignments').select('*')
   ]);
   pools       = p || [];
-  workers     = w || []
+  workers     = w || [];
   assignments = {};
   (a||[]).forEach(r => assignments[r.worker_id] = r.pool_id);
   renderAll();
 }
 
 function subscribeRealtime() {
+  // FIX: use debouncedLoadAll so rapid insert+update from a single dispatch
+  // doesn't fire loadAll (and re-render log) twice in quick succession
   db.channel('bench-changes')
-    .on('postgres_changes', { event:'*', schema:'public', table:'bench_workers' }, () => loadAll())
-    .on('postgres_changes', { event:'*', schema:'public', table:'bench_pools' },   () => loadAll())
+    .on('postgres_changes', { event:'*', schema:'public', table:'bench_workers' }, debouncedLoadAll)
+    .on('postgres_changes', { event:'*', schema:'public', table:'bench_pools' },   debouncedLoadAll)
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'bench_log' }, payload => appendLog(payload.new))
     .subscribe();
 }
@@ -905,7 +912,7 @@ function renderWorkers() {
   const el = document.getElementById('worker-cards');
   el.innerHTML = '';
   if (!workers.length) {
-    el.innerHTML = '<div style="padding:20px;color:var(--fg2)">No workers yet. Use the Platforms tab or Acquisition tab to dispatch a real worker.</div>';
+    el.innerHTML = '<div style="padding:20px;color:var(--fg2)">No workers yet. Use the Platforms tab to dispatch.</div>';
     return;
   }
   workers.forEach(w => {
@@ -915,13 +922,12 @@ function renderWorkers() {
     const isMining = w.status==='mining';
     const isConn   = w.status==='connecting';
     const cls  = isMining ? 'mining' : (isConn ? 'connecting' : (isErr ? 'error' : ''));
-    const srcLabel = w.source ? `<div class="wc-src">★ ${esc(w.source)}</div>` : '';
     const card = document.createElement('div');
     card.className = `worker-card ${cls}`;
     card.id = `card-${w.id}`;
     card.innerHTML = `
       <div class="wc-rig">${esc(w.rig_id)}</div>
-      ${srcLabel}
+      ${w.source ? `<div class="wc-src">★ ${esc(w.source)}</div>` : ''}
       <div class="wc-pool">${pool ? '→ '+esc(pool.name) : (w.pool_url ? '→ '+esc(w.pool_url) : '<span style="color:var(--yellow)">unassigned</span>')}</div>
       <div class="wc-stats">
         <div class="wc-stat"><label>Status</label><span style="color:${isErr?'var(--red)':(isMining?'var(--green)':'inherit')}">${esc(w.status||'idle')}</span></div>
@@ -985,12 +991,10 @@ function renderPipeline() {
   workers.forEach(w => {
     const isErr   = (w.status||'').startsWith('err');
     const stepCls = w.status==='mining'?'ps-mining':(w.status==='connecting'?'ps-connecting':(isErr?'ps-error':'ps-stopped'));
-    const acqTime = w.acquired_at ? `→ online ${fmtAgo(w.acquired_at)}` : '';
     el.innerHTML += `<div class="pipeline-row">
       <span class="pipeline-step ${stepCls}">${esc(w.status||'idle')}</span>
       <span><b>${esc(w.rig_id)}</b></span>
       <span style="color:var(--orange)">${esc(w.source||'manual')}</span>
-      <span style="color:var(--accent2)">${acqTime}</span>
       <span style="color:var(--green);margin-left:auto">${Math.round(w.hashrate||0).toLocaleString()} H/s</span>
       <span style="color:var(--fg2)">${w.shares||0} shares</span>
     </div>`;
@@ -1030,12 +1034,12 @@ async function refreshFleet() {
         <tr><td>Last scavenger scan</td><td style="color:var(--fg2)">${esc(scan)}</td></tr>
       </table>
       <div style="margin-top:8px">
-        <a href="https://github.com/${GH_REPO}/blob/main/fleet/harvest/workers.yaml" target="_blank" style="font-size:11px">View full registry ↗</a>
-        &nbsp;&middot;&nbsp;
+        <a href="https://github.com/${GH_REPO}/blob/main/fleet/harvest/workers.yaml" target="_blank" style="font-size:11px">View registry ↗</a>
+        &nbsp;·&nbsp;
         <a href="https://github.com/${GH_REPO}/actions/workflows/scavenger.yml" target="_blank" style="font-size:11px">Run scavenger ↗</a>
       </div>`;
   } catch(e) {
-    el.innerHTML = `<span class="tag-fail">Failed to load: ${esc(String(e))}</span>`;
+    el.innerHTML = `<span class="tag-fail">Failed: ${esc(String(e))}</span>`;
   }
 }
 document.getElementById('btn-refresh-fleet').addEventListener('click', refreshFleet);
@@ -1049,10 +1053,10 @@ async function dispatchWorker() {
   const duration = parseInt(document.getElementById('acq-duration').value) || 30;
   const poolUrl  = document.getElementById('acq-pool-url').value.trim() || getPoolUrl();
   const { data: w, error } = await db.from('bench_workers')
-    .insert({ rig_id: rig, user_id: session.user.id, status:'dispatching', source:'github_actions', pool_url: poolUrl })
+    .insert({ rig_id:rig, user_id:session.user.id, status:'dispatching', source:'github_actions', pool_url:poolUrl })
     .select().single();
   if (error || !w) { log('Failed to create worker row: '+(error?.message||'unknown'), 'err'); return; }
-  log(`Dispatching ${rig} via GitHub Actions (${duration}min @ ${poolUrl})...`);
+  log(`Dispatching ${rig} via GitHub Actions (${duration}min)...`);
   try {
     const r = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WF}/dispatches`, {
       method: 'POST',
@@ -1060,16 +1064,15 @@ async function dispatchWorker() {
       body: JSON.stringify({ ref:'main', inputs:{ worker_id:w.id, pool_url:poolUrl, rig_id:rig, duration_minutes:String(duration) } })
     });
     if (r.status === 204) {
-      log(`✓ Dispatched ${rig} — worker ID: ${w.id.slice(0,8)}`, 'ok');
+      log(`✓ Dispatched ${rig} — ${w.id.slice(0,8)}`, 'ok');
       dispatchedRuns[w.id] = { rig_id:rig, dispatched_at:new Date().toISOString() };
       renderPipeline();
-      setTimeout(() => pollRunStatuses(), 5000);
     } else {
       throw new Error(`GitHub API ${r.status}: ${(await r.text()).slice(0,120)}`);
     }
   } catch(e) {
     log(`✗ Dispatch failed: ${e.message}`, 'err');
-    await db.from('bench_workers').update({ status:'err:dispatch failed' }).eq('id', w.id);
+    await db.from('bench_workers').update({ status:'err:dispatch' }).eq('id', w.id);
   }
   await loadAll();
 }
@@ -1087,7 +1090,7 @@ async function pollRunStatuses() {
   } catch { }
 }
 
-// ── Pool test ─────────────────────────────────────────────────────────────────
+// ── Pool management ───────────────────────────────────────────────────────────
 
 document.getElementById('btn-add-pool').addEventListener('click', () => openModal('modal-add-pool'));
 document.getElementById('ap-cancel').addEventListener('click', () => closeModal('modal-add-pool'));
@@ -1161,7 +1164,7 @@ async function removeWorker(id) {
 document.getElementById('btn-stop-all').addEventListener('click', async () => {
   if (!confirm('Mark all workers as stopped?')) return;
   for (const w of workers) await db.from('bench_workers').update({status:'stopped',hashrate:0}).eq('id',w.id);
-  await loadAll(); log('Marked all workers stopped','warn');
+  await loadAll(); log('Marked all stopped','warn');
 });
 
 // ── Log ───────────────────────────────────────────────────────────────────────
