@@ -111,6 +111,38 @@ a{color:var(--accent2)}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
+
+    /* ── Assignments tab ── */
+    #pane-assign { padding: 16px; overflow-y: auto; }
+    .assign-pool-card {
+      background: var(--surface2);
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      transition: border-color .15s;
+    }
+    .assign-pool-card.drag-over { border-color: var(--accent); background: #1a2a1a; }
+    .assign-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--surface3,#2a2a2a); border: 1px solid #555;
+      border-radius: 12px; padding: 2px 8px;
+      font-size: 11px; cursor: grab; user-select: none;
+      transition: background .15s;
+    }
+    .assign-chip:hover { background: #333; }
+    .assign-worker-row {
+      background: var(--surface2);
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      cursor: grab;
+      transition: border-color .15s, opacity .15s;
+    }
+    .assign-worker-row:hover { border-color: #555; }
+    .assign-worker-row.dragging { opacity: .4; }
+    .assign-pool-select:focus { outline: 1px solid var(--accent); }
 </style>
 </head>
 <body>
@@ -181,6 +213,7 @@ a{color:var(--accent2)}
         <div class="tab" data-tab="platforms">Platforms</div>
         <div class="tab" data-tab="workers">Workers</div>
         <div class="tab" data-tab="pools">Pools</div>
+        <div class="tab" data-tab="assign">Assignments</div>
         <div class="tab" data-tab="log">Log</div>
       </div>
 
@@ -224,6 +257,32 @@ a{color:var(--accent2)}
           <thead><tr><th>Name</th><th>URL</th><th>Coin</th><th>Up</th><th>Height</th><th>Latency</th><th>Auth</th><th></th></tr></thead>
           <tbody id="pool-tbody"></tbody>
         </table>
+      </div>
+
+      <!-- ASSIGNMENTS TAB -->
+      <div class="tab-pane" id="pane-assign">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:600;color:var(--fg1)">Pool Assignments</span>
+          <span style="font-size:11px;color:var(--fg2);flex:1">Drag a worker onto a pool — or use the dropdowns.</span>
+          <button class="btn btn-ghost" style="font-size:11px;padding:3px 10px" onclick="clearAllAssignments()">Clear All</button>
+        </div>
+
+        <!-- Two-column layout: pools on left, workers on right -->
+        <div id="assign-board" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+
+          <!-- POOLS COLUMN -->
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg2);margin-bottom:8px">Pools</div>
+            <div id="assign-pool-list"></div>
+          </div>
+
+          <!-- WORKERS COLUMN -->
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg2);margin-bottom:8px">Workers</div>
+            <div id="assign-worker-list"></div>
+          </div>
+
+        </div>
       </div>
 
       <!-- LOG TAB -->
@@ -1007,7 +1066,127 @@ function subscribeRealtime() {
 
 // ── Render ────────────────────────────────────────────────────────────────────
 
-function renderAll() { renderWorkers(); renderPools(); renderSidebar(); renderPipeline(); }
+
+// ════════════════════════════════════════════════════════════
+// ASSIGNMENTS TAB
+// ════════════════════════════════════════════════════════════
+
+function renderAssignments() {
+  const poolList   = document.getElementById('assign-pool-list');
+  const workerList = document.getElementById('assign-worker-list');
+  if (!poolList || !workerList) return;
+
+  // ── Pool cards (drop targets) ────────────────────────────
+  poolList.innerHTML = '';
+  if (!pools.length) {
+    poolList.innerHTML = '<div style="color:var(--fg2);font-size:12px;padding:10px">No pools yet. Add one in the Pools tab.</div>';
+  }
+  pools.forEach(pool => {
+    const assigned = workers.filter(w => assignments[w.id] === pool.id);
+    const tr       = pool.test_result || {};
+    const dot      = (tr.reachable||tr.subscribed) ? '🟢' : (tr.hasOwnProperty('reachable') ? '🔴' : '⚪');
+    const card     = document.createElement('div');
+    card.className = 'assign-pool-card';
+    card.dataset.poolId = pool.id;
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <span>${dot}</span>
+        <span style="font-weight:600;font-size:12px">${esc(pool.name)}</span>
+        <span style="font-size:10px;color:var(--fg2);margin-left:auto">${pool.protocol||'http'} · ${pool.coin||'?'}</span>
+      </div>
+      <div style="font-size:10px;color:var(--fg2);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(pool.url||'')}</div>
+      <div class="assign-worker-slots" data-pool-id="${pool.id}" style="min-height:36px;border:1px dashed #444;border-radius:6px;padding:4px;display:flex;flex-wrap:wrap;gap:4px">
+        ${assigned.length ? assigned.map(w => `
+          <div class="assign-chip" data-worker-id="${w.id}" draggable="true" title="${esc(w.status||'idle')}">
+            <span>${esc(w.rig_id||w.id.slice(0,8))}</span>
+            <button onclick="unassignWorker('${w.id}')" style="background:none;border:none;color:var(--fg2);cursor:pointer;font-size:10px;padding:0 2px;line-height:1" title="Unassign">✕</button>
+          </div>`).join('') : '<span style="font-size:10px;color:#555;padding:4px">drop workers here</span>'}
+      </div>`;
+    // Drop target events
+    card.addEventListener('dragover',  e => { e.preventDefault(); card.classList.add('drag-over'); });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', async e => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      const wid = e.dataTransfer.getData('worker-id');
+      if (wid) await assignWorker(wid, pool.id);
+    });
+    poolList.appendChild(card);
+  });
+
+  // ── Worker chips (draggable + dropdown) ──────────────────
+  workerList.innerHTML = '';
+  if (!workers.length) {
+    workerList.innerHTML = '<div style="color:var(--fg2);font-size:12px;padding:10px">No workers yet.</div>';
+  }
+  workers.forEach(w => {
+    const pid        = assignments[w.id];
+    const poolName   = pid ? (pools.find(p=>p.id===pid)||{}).name||'?' : null;
+    const isMining   = w.status==='mining';
+    const isErr      = (w.status||'').startsWith('err');
+    const statusCol  = isMining ? 'var(--green)' : (isErr ? 'var(--red)' : 'var(--fg2)');
+    const row        = document.createElement('div');
+    row.className    = 'assign-worker-row';
+    row.draggable    = true;
+    row.dataset.workerId = w.id;
+    row.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.rig_id||w.id.slice(0,8))}</div>
+          <div style="font-size:10px;color:${statusCol}">${esc(w.status||'idle')} ${isMining&&w.hashrate?'· '+Math.round(w.hashrate).toLocaleString()+' H/s':''}</div>
+        </div>
+        <select class="assign-pool-select" data-worker-id="${w.id}" style="font-size:11px;background:var(--surface2);border:1px solid #444;border-radius:4px;padding:2px 4px;color:var(--fg1);max-width:130px">
+          <option value="">— unassigned —</option>
+          ${pools.map(p=>`<option value="${p.id}" ${pid===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}
+        </select>
+      </div>`;
+    // Drag source
+    row.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('worker-id', w.id);
+      row.classList.add('dragging');
+    });
+    row.addEventListener('dragend', () => row.classList.remove('dragging'));
+    // Dropdown change
+    row.querySelector('.assign-pool-select').addEventListener('change', async e => {
+      const newPid = e.target.value;
+      if (newPid) await assignWorker(w.id, newPid);
+      else        await unassignWorker(w.id);
+    });
+    workerList.appendChild(row);
+  });
+}
+
+async function assignWorker(workerId, poolId) {
+  const pool   = pools.find(p=>p.id===poolId);
+  const worker = workers.find(w=>w.id===workerId);
+  if (!pool||!worker) return;
+  // Upsert into bench_assignments
+  await db.from('bench_assignments').upsert(
+    { worker_id: workerId, pool_id: poolId, assigned_by: session.user.id },
+    { onConflict: 'worker_id' }
+  );
+  // Also update pool_url on the worker row so dispatch picks it up
+  await db.from('bench_workers').update({ pool_url: pool.url }).eq('id', workerId);
+  log(`Assigned ${worker.rig_id||workerId} → ${pool.name}`, 'ok');
+  await loadAll();
+}
+
+async function unassignWorker(workerId) {
+  await db.from('bench_assignments').delete().eq('worker_id', workerId);
+  await db.from('bench_workers').update({ pool_url: null }).eq('id', workerId);
+  const worker = workers.find(w=>w.id===workerId);
+  log(`Unassigned ${worker?.rig_id||workerId}`, 'info');
+  await loadAll();
+}
+
+async function clearAllAssignments() {
+  if (!confirm('Clear all worker assignments?')) return;
+  await db.from('bench_assignments').delete().neq('worker_id','00000000-0000-0000-0000-000000000000');
+  log('All assignments cleared', 'info');
+  await loadAll();
+}
+
+function renderAll() { renderWorkers(); renderPools(); renderAssignments(); renderSidebar(); renderPipeline(); }
 
 function renderWorkers() {
   const el = document.getElementById('worker-cards');
