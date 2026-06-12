@@ -198,6 +198,14 @@ a{color:var(--accent2)}
         <label style="color:var(--fg2);font-size:10px">Discord Webhook (optional)</label>
         <input id="discord-webhook-setting" type="password" placeholder="https://discord.com/api/webhooks/..." style="background:var(--bg3);color:var(--fg);border:1px solid #333;padding:4px 8px;border-radius:4px;font-family:var(--font);font-size:11px;width:100%">
         <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px" onclick="saveDiscordWebhook()">Save Webhook</button>
+        <div style="margin-top:10px;border-top:1px solid #333;padding-top:8px">
+          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:2px">Stratum User <span style="color:#888">(wallet.worker)</span></label>
+          <input id="stratum-user-setting" type="text" placeholder="ADDRESS.workername" style="background:var(--bg3);color:var(--fg);border:1px solid #333;padding:4px 8px;border-radius:4px;font-family:var(--font);font-size:11px;width:100%;margin-bottom:4px">
+          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:2px">Stratum Pass</label>
+          <input id="stratum-pass-setting" type="text" placeholder="x" style="background:var(--bg3);color:var(--fg);border:1px solid #333;padding:4px 8px;border-radius:4px;font-family:var(--font);font-size:11px;width:100%;margin-bottom:4px">
+          <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px" onclick="saveStratumCreds()">Save Stratum Creds</button>
+          <div id="stratum-creds-status" style="font-size:10px;color:var(--ok);margin-top:2px"></div>
+        </div>
         <div id="discord-status" style="font-size:10px;color:var(--fg2);margin-top:2px"></div>
       </div>
       <div class="stat-row" style="flex-direction:column;gap:4px;margin-top:12px">
@@ -984,12 +992,29 @@ function loadSettings() {
   const pat     = localStorage.getItem('gm_gh_pat') || '';
   const url     = localStorage.getItem('gm_pool_url') || DEFAULT_POOL;
   const webhook = localStorage.getItem('gm_discord_webhook') || '';
+  const sUser   = localStorage.getItem('gm_stratum_user') || '';
+  const sPass   = localStorage.getItem('gm_stratum_pass') || 'x';
   document.getElementById('gh-pat').value = pat;
   document.getElementById('pool-url-setting').value = url;
   document.getElementById('acq-pool-url').value = url;
   document.getElementById('discord-webhook-setting').value = webhook;
   if (webhook) document.getElementById('discord-status').textContent = '✓ Webhook set';
+  const su = document.getElementById('stratum-user-setting');
+  const sp = document.getElementById('stratum-pass-setting');
+  if (su) su.value = sUser;
+  if (sp) sp.value = sPass;
+  if (sUser) { const el = document.getElementById('stratum-creds-status'); if(el) el.textContent = '✓ Stratum creds set'; }
 }
+function saveStratumCreds() {
+  const u = document.getElementById('stratum-user-setting').value.trim();
+  const p = document.getElementById('stratum-pass-setting').value.trim() || 'x';
+  localStorage.setItem('gm_stratum_user', u);
+  localStorage.setItem('gm_stratum_pass', p);
+  document.getElementById('stratum-creds-status').textContent = u ? '✓ Stratum creds saved' : '⚠ Cleared';
+  log('Stratum creds saved → ' + (u || 'empty'), u ? 'ok' : 'warn');
+}
+function getStratumUser() { return localStorage.getItem('gm_stratum_user') || ''; }
+function getStratumPass() { return localStorage.getItem('gm_stratum_pass') || 'x'; }
 function savePat() {
   localStorage.setItem('gm_gh_pat', document.getElementById('gh-pat').value.trim());
   log('GitHub PAT saved', 'ok');
@@ -1272,7 +1297,7 @@ async function dispatchFromAssignment(workerId, poolIdOverride) {
       pool_url:  pool.url,
       rig_id:    worker.rig_id || 'bench-rig',
       duration_minutes: String(duration),
-      stratum_user: pool.stratum_user || '',
+      stratum_user: pool.stratum_user || getStratumUser(),
       stratum_pass: pool.stratum_pass || 'x'
     }})
   });
@@ -1519,7 +1544,7 @@ async function dispatchWorker() {
         pool_url:  poolUrl,
         rig_id:    rig,
         duration_minutes: String(duration),
-        stratum_user: assignedPool?.stratum_user || '',
+        stratum_user: assignedPool?.stratum_user || getStratumUser(),
         stratum_pass: assignedPool?.stratum_pass || 'x'
       } })
     });
