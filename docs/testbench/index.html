@@ -162,6 +162,12 @@ a{color:var(--accent2)}
         <input id="pool-url-setting" placeholder="https://ox518.github.io/genFre" style="background:var(--bg3);color:var(--fg);border:1px solid #333;padding:4px 8px;border-radius:4px;font-family:var(--font);font-size:11px;width:100%">
         <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px" onclick="savePoolUrl()">Save URL</button>
       </div>
+      <div class="stat-row" style="flex-direction:column;gap:4px;margin-top:8px">
+        <label style="color:var(--fg2);font-size:10px">Discord Webhook (optional)</label>
+        <input id="discord-webhook-setting" type="password" placeholder="https://discord.com/api/webhooks/..." style="background:var(--bg3);color:var(--fg);border:1px solid #333;padding:4px 8px;border-radius:4px;font-family:var(--font);font-size:11px;width:100%">
+        <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px" onclick="saveDiscordWebhook()">Save Webhook</button>
+        <div id="discord-status" style="font-size:10px;color:var(--fg2);margin-top:2px"></div>
+      </div>
     </div>
 
     <div id="main">
@@ -845,11 +851,14 @@ async function platformTest(platId) {
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 function loadSettings() {
-  const pat = localStorage.getItem('gm_gh_pat') || '';
-  const url = localStorage.getItem('gm_pool_url') || DEFAULT_POOL;
+  const pat     = localStorage.getItem('gm_gh_pat') || '';
+  const url     = localStorage.getItem('gm_pool_url') || DEFAULT_POOL;
+  const webhook = localStorage.getItem('gm_discord_webhook') || '';
   document.getElementById('gh-pat').value = pat;
   document.getElementById('pool-url-setting').value = url;
   document.getElementById('acq-pool-url').value = url;
+  document.getElementById('discord-webhook-setting').value = webhook;
+  if (webhook) document.getElementById('discord-status').textContent = '✓ Webhook set';
 }
 function savePat() {
   localStorage.setItem('gm_gh_pat', document.getElementById('gh-pat').value.trim());
@@ -861,8 +870,30 @@ function savePoolUrl() {
   document.getElementById('acq-pool-url').value = u;
   log('Pool URL saved', 'ok');
 }
-function getPat()     { return localStorage.getItem('gm_gh_pat') || ''; }
-function getPoolUrl() { return localStorage.getItem('gm_pool_url') || DEFAULT_POOL; }
+function saveDiscordWebhook() {
+  const w = document.getElementById('discord-webhook-setting').value.trim();
+  localStorage.setItem('gm_discord_webhook', w);
+  document.getElementById('discord-status').textContent = w ? '✓ Webhook saved' : 'Cleared';
+  log('Discord webhook ' + (w ? 'saved' : 'cleared'), 'ok');
+}
+function getPat()             { return localStorage.getItem('gm_gh_pat') || ''; }
+function getPoolUrl()         { return localStorage.getItem('gm_pool_url') || DEFAULT_POOL; }
+function getDiscordWebhook()  { return localStorage.getItem('gm_discord_webhook') || ''; }
+
+// ── Discord notification helper ───────────────────────────────────────────────
+async function notifyDiscord(content) {
+  // Always route through bench-relay to avoid CORS
+  const token = session?.access_token;
+  if (!token) return;
+  try {
+    await fetch(RELAY + '/discord', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+      signal: AbortSignal.timeout(6000)
+    });
+  } catch { /* non-fatal */ }
+}
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -917,8 +948,30 @@ async function loadAll() {
 
 function subscribeRealtime() {
   db.channel('bench-changes')
-    .on('postgres_changes', { event:'*', schema:'public', table:'bench_workers' }, debouncedLoadAll)
-    .on('postgres_changes', { event:'*', schema:'public', table:'bench_pools' },   debouncedLoadAll)
+    .on('postgres_changes', { event:'*', schema:'public', table:'bench_workers' }, payload => {
+      debouncedLoadAll();
+      // Discord: notify on share/hashrate updates from mining workers
+      if (getDiscordWebhook() && payload.new && payload.eventType === 'UPDATE') {
+        const w = payload.new;
+        if (w.status === 'mining' && (w.shares > 0 || w.hashrate > 0)) {
+          const msg = `⛏ **${w.rig_id}** — ${Math.round(w.hashrate||0).toLocaleString()} H/s | ${w.shares||0} shares | uptime ${fmtUptime(w.uptime_s||0)}`;
+          notifyDiscord(msg);
+        }
+      }
+    })
+    .on('postgres_changes', { event:'*', schema:'public', table:'bench_pools' }, payload => {
+      debouncedLoadAll();
+      // Discord: notify on pool up/down changes
+      if (getDiscordWebhook() && payload.new && payload.eventType === 'UPDATE') {
+        const p = payload.new;
+        const tr = p.test_result || {};
+        if (tr.hasOwnProperty('reachable')) {
+          const emoji = tr.reachable ? '🟢' : '🔴';
+          const status = tr.reachable ? `up | ${tr.latency_ms}ms | h=${tr.height||'?'}` : 'down';
+          notifyDiscord(`${emoji} Pool **${p.name}** ${status}`);
+        }
+      }
+    })
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'bench_log' }, payload => appendLog(payload.new))
     .subscribe();
 }
