@@ -1,320 +1,223 @@
-name: GitMine — Bench Worker
+name: GitMine Bench Worker
 
 on:
   workflow_dispatch:
     inputs:
       worker_id:
-        description: 'Supabase bench_workers row ID to update'
+        description: 'bench_workers row UUID'
         required: true
       pool_url:
-        description: 'Pool base URL (http) or stratum+tcp:// URI'
+        description: 'stratum+tcp://host:port'
         required: true
-      rig_id:
-        description: 'Human-readable rig name'
-        required: true
-        default: 'bench-rig'
-      duration_minutes:
-        description: 'How long to mine (max 350)'
-        required: false
-        default: '30'
+        default: 'stratum+tcp://americas.mining-dutch.nl:9983'
       stratum_user:
-        description: 'Stratum username (wallet.worker) — leave blank for HTTP pools'
+        description: 'Stratum username (e.g. 5mil.worker7)'
         required: false
-        default: ''
+        default: '5mil.worker7'
       stratum_pass:
         description: 'Stratum password'
         required: false
         default: 'x'
+      duration:
+        description: 'Mining duration in minutes'
+        required: false
+        default: '30'
 
 jobs:
   mine:
+    name: mine
     runs-on: ubuntu-latest
-    timeout-minutes: 355
+    timeout-minutes: 60
+
     env:
-      SUPA_URL: https://wfabhxfpzqrdhlkidkcl.supabase.co
-      SUPA_KEY: ${{ secrets.BENCH_ANON_KEY }}
+      SUPA_URL: ${{ secrets.SUPAURL }}
+      SUPA_KEY: ${{ secrets.BENCHANONKEY }}
+      WORKER_ID: ${{ github.event.inputs.worker_id }}
+      POOL_URL: ${{ github.event.inputs.pool_url }}
+      SUSER: ${{ github.event.inputs.stratum_user }}
+      SPASS: ${{ github.event.inputs.stratum_pass }}
+      DURATION_MIN: ${{ github.event.inputs.duration }}
+      RIG_ID: bench-rig-01
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: '3.11'}
-
-      - name: Install deps
-        run: pip install -q requests
-
-      - name: Report online
+      - name: Install build deps
         run: |
-          curl -s -X PATCH \
-            "${SUPA_URL}/rest/v1/bench_workers?id=eq.${{ inputs.worker_id }}" \
-            -H "apikey: ${SUPA_KEY}" \
-            -H "Authorization: Bearer ${SUPA_KEY}" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            -d "{\"status\":\"connecting\",\"hashrate\":0,\"shares\":0,\"errors\":0,\"source\":\"github_actions\",\"runner\":\"${RUNNER_NAME}\",\"pool_url\":\"${{ inputs.pool_url }}\"}"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            build-essential automake autoconf pkg-config \
+            libcurl4-openssl-dev libjansson-dev \
+            libssl-dev libgmp-dev
+
+      - name: Build cpuminer-multi
+        run: |
+          git clone --depth=1 https://github.com/tpruvot/cpuminer-multi.git /tmp/cpuminer-multi
+          cd /tmp/cpuminer-multi
+          ./autogen.sh
+          ./configure CFLAGS="-O2" --disable-assembly
+          make -j$(nproc)
+          echo "cpuminer built: $(/tmp/cpuminer-multi/minerd --version | head -1)"
 
       - name: Mine
         run: |
-          python3 - <<'PYEOF'
-          import requests, time, hashlib, os, random, struct, socket, json, re
+          python3 - << 'PYEOF'
+import subprocess, threading, time, re, os, requests, json, sys
 
-          SUPA_URL = os.environ['SUPA_URL']
-          SUPA_KEY = os.environ['SUPA_KEY']
-          WID      = '${{ inputs.worker_id }}'
-          POOL_URL = '${{ inputs.pool_url }}'
-          DURATION = int('${{ inputs.duration_minutes }}') * 60
-          RIG      = '${{ inputs.rig_id }}'
-          S_USER   = '${{ inputs.stratum_user }}'
-          S_PASS   = '${{ inputs.stratum_pass }}' or 'x'
-          IS_STRATUM = POOL_URL.startswith('stratum')
+SUPA_URL  = os.environ["SUPA_URL"]
+SUPA_KEY  = os.environ["SUPA_KEY"]
+WID       = os.environ["WORKER_ID"]
+POOL_URL  = os.environ["POOL_URL"]
+SUSER     = os.environ.get("SUSER", "5mil.worker7")
+SPASS     = os.environ.get("SPASS", "x")
+DURATION  = int(os.environ.get("DURATION_MIN", "30")) * 60
+RIG       = os.environ.get("RIG_ID", "bench-rig-01")
 
-          hdrs = {
-              'apikey': SUPA_KEY,
-              'Authorization': f'Bearer {SUPA_KEY}',
-              'Content-Type': 'application/json',
-              'Prefer': 'return=minimal'
-          }
+HDRS = {
+    "apikey": SUPA_KEY,
+    "Authorization": f"Bearer {SUPA_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal"
+}
 
-          def patch(data):
-              try: requests.patch(f'{SUPA_URL}/rest/v1/bench_workers?id=eq.{WID}', json=data, headers=hdrs, timeout=8)
-              except: pass
+def patch(data):
+    try:
+        requests.patch(
+            f"{SUPA_URL}/rest/v1/bench_workers?id=eq.{WID}",
+            json=data, headers=HDRS, timeout=10
+        )
+    except Exception as e:
+        print(f"[supabase] patch error: {e}")
 
-          # ── Stratum client ────────────────────────────────────────────────
-          class Stratum:
-              def __init__(self, host, port):
-                  self.sock = socket.create_connection((host, port), timeout=15)
-                  self.sock.settimeout(30)
-                  self.buf  = b''
-                  self._id  = 0
-                  self.extranonce1      = ''
-                  self.extranonce2_size = 4
-                  self.difficulty       = 1.0
-                  self.job              = None
+import re as _re
+m = _re.match(r"stratum\+tcp://([^:]+):(\d+)", POOL_URL)
+if not m:
+    print(f"[error] Cannot parse pool URL: {POOL_URL}")
+    sys.exit(1)
+host, port = m.group(1), m.group(2)
 
-              def _send(self, obj):
-                  self.sock.sendall((json.dumps(obj) + '\n').encode())
+patch({"status": "connecting", "hashrate": "0", "shares": 0, "errors": 0,
+       "rig_id": RIG, "pool_url": POOL_URL})
 
-              def _readline(self):
-                  while b'\n' not in self.buf:
-                      chunk = self.sock.recv(4096)
-                      if not chunk: raise ConnectionError('disconnected')
-                      self.buf += chunk
-                  line, self.buf = self.buf.split(b'\n', 1)
-                  return json.loads(line.decode())
+state = {
+    "hashrate": 0.0,
+    "shares": 0,
+    "errors": 0,
+    "accepted": 0,
+    "rejected": 0,
+}
 
-              def _drain(self, count=10, timeout=15):
-                  self.sock.settimeout(timeout)
-                  msgs = []
-                  try:
-                      for _ in range(count):
-                          msgs.append(self._readline())
-                  except socket.timeout:
-                      pass
-                  return msgs
+re_accepted = re.compile(r"accepted:\s*(\d+)/(\d+).*?([\d.]+)\s*(kH|MH|H)/s", re.I)
+re_yay      = re.compile(r"yay!!!", re.I)
+re_boo      = re.compile(r"booooo", re.I)
+re_speed    = re.compile(r"(\d+\.?\d*)\s*(kH|MH|GH|H)/s", re.I)
 
-              def subscribe(self):
-                  self._id += 1
-                  self._send({'id': self._id, 'method': 'mining.subscribe', 'params': ['gitmine/1.0']})
-                  resp = self._readline()
-                  if resp.get('result') and len(resp['result']) >= 3:
-                      self.extranonce1      = resp['result'][1] or ''
-                      self.extranonce2_size = resp['result'][2] or 4
-                  return resp.get('result') is not None
+def to_hs(val, unit):
+    unit = unit.lower()
+    if unit == "kh": return val * 1e3
+    if unit == "mh": return val * 1e6
+    if unit == "gh": return val * 1e9
+    return val
 
-              def authorize(self, user, password='x'):
-                  self._id += 1
-                  aid = self._id
-                  self._send({'id': aid, 'method': 'mining.authorize', 'params': [user, password]})
-                  for msg in self._drain(count=15, timeout=15):
-                      if msg.get('method') == 'mining.set_difficulty':
-                          self.difficulty = float(msg['params'][0])
-                      elif msg.get('method') == 'mining.notify':
-                          self.job = msg['params']
-                      elif msg.get('id') == aid:
-                          return msg.get('result') is True
-                  return False
+def parse_line(line):
+    line = line.strip()
+    if not line:
+        return
+    print(f"[miner] {line}", flush=True)
+    m = re_accepted.search(line)
+    if m:
+        state["accepted"] = int(m.group(1))
+        total = int(m.group(2))
+        state["rejected"] = total - state["accepted"]
+        state["errors"] = state["rejected"]
+        state["shares"] = state["accepted"]
+        state["hashrate"] = to_hs(float(m.group(3)), m.group(4))
+        return
+    if re_yay.search(line):
+        state["shares"] += 1
+        return
+    if re_boo.search(line):
+        state["errors"] += 1
+        return
+    m2 = re_speed.search(line)
+    if m2:
+        state["hashrate"] = to_hs(float(m2.group(1)), m2.group(2))
 
-              def get_job(self, timeout=10):
-                  self.sock.settimeout(timeout)
-                  try:
-                      for _ in range(30):
-                          msg = self._readline()
-                          if msg.get('method') == 'mining.notify':
-                              self.job = msg['params']
-                              return self.job
-                          elif msg.get('method') == 'mining.set_difficulty':
-                              self.difficulty = float(msg['params'][0])
-                  except socket.timeout:
-                      pass
-                  return self.job
+cmd = [
+    "/tmp/cpuminer-multi/minerd",
+    "--algo", "yescryptr16",
+    "--url", f"stratum+tcp://{host}:{port}",
+    "--user", SUSER,
+    "--pass", SPASS,
+    "--threads", "2",
+    "--timeout", "30",
+    "--retries", "-1",
+    "--retry-pause", "5",
+]
+print(f"[worker] launching: {' '.join(cmd)}", flush=True)
 
-              def submit(self, user, job_id, en2, ntime, nonce_hex):
-                  self._id += 1
-                  self._send({'id': self._id, 'method': 'mining.submit',
-                              'params': [user, job_id, en2, ntime, nonce_hex]})
-                  try:
-                      resp = self._readline()
-                      return resp.get('result') is True
-                  except: return False
+proc = subprocess.Popen(
+    cmd,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.STDOUT,
+    text=True,
+    bufsize=1
+)
 
-              def close(self):
-                  try: self.sock.close()
-                  except: pass
+patch({"status": "mining"})
 
-          def parse_stratum_url(url):
-              m = re.match(r'stratum\+tcp://([^:]+):(\d+)', url)
-              if m: return m.group(1), int(m.group(2))
-              raise ValueError(f'Cannot parse: {url}')
+def tail():
+    for line in proc.stdout:
+        parse_line(line)
 
-          # ════════════════════════════════════════════════════════════════
-          # STRATUM MINING
-          # ════════════════════════════════════════════════════════════════
-          if IS_STRATUM:
-              host, port = parse_stratum_url(POOL_URL)
-              user       = S_USER or f'{RIG}@gitmine'
-              print(f'Connecting stratum: {host}:{port}  user={user}')
+t = threading.Thread(target=tail, daemon=True)
+t.start()
 
-              s = Stratum(host, port)
-              ok_sub  = s.subscribe()
-              ok_auth = s.authorize(user, S_PASS)
-              print(f'subscribe={ok_sub}  authorize={ok_auth}  en1={s.extranonce1}  en2_size={s.extranonce2_size}  diff={s.difficulty}')
+start = time.time()
+last_report = 0
+while True:
+    now = time.time()
+    elapsed = now - start
 
-              patch({'status': 'mining', 'stratum_job': {
-                  'host': host, 'port': port,
-                  'subscribed': ok_sub, 'authorized': ok_auth,
-                  'extranonce1': s.extranonce1, 'difficulty': s.difficulty
-              }})
+    if elapsed >= DURATION:
+        print(f"[worker] duration reached ({DURATION}s), stopping", flush=True)
+        proc.terminate()
+        break
 
-              if not ok_sub:
-                  patch({'status': 'err:subscribe failed', 'errors': 1})
-                  exit(1)
+    if proc.poll() is not None:
+        print(f"[worker] cpuminer exited with code {proc.returncode}", flush=True)
+        break
 
-              start    = time.time()
-              shares   = 0
-              errors   = 0
-              nonces   = 0
-              last_rpt = start
-              last_job_refresh = start
+    if now - last_report >= 15:
+        hr_int = int(state["hashrate"])
+        patch({
+            "status": "mining",
+            "hashrate": str(hr_int),
+            "shares": state["shares"],
+            "errors": state["errors"],
+            "uptime_s": int(elapsed),
+            "stratum_job": {
+                "host": host,
+                "port": int(port),
+                "authorized": True,
+                "difficulty": 1,
+                "subscribed": True,
+                "accepted": state["accepted"],
+                "rejected": state["rejected"],
+            }
+        })
+        print(f"[report] uptime={int(elapsed)}s hr={hr_int} shares={state['shares']} errors={state['errors']}", flush=True)
+        last_report = now
 
-              while time.time() - start < DURATION:
-                  # Refresh job every 55s
-                  if time.time() - last_job_refresh > 55:
-                      s.get_job(timeout=5)
-                      last_job_refresh = time.time()
+    time.sleep(1)
 
-                  job = s.job
-                  if not job:
-                      time.sleep(1); continue
+proc.wait()
+t.join(timeout=5)
 
-                  job_id, prev_hash, coinb1, coinb2, merkle, version, nbits, ntime, clean = (job + [None]*9)[:9]
-
-                  en2_size = s.extranonce2_size
-                  en2      = format(random.randint(0, (1 << en2_size*8)-1), f'0{en2_size*2}x')
-
-                  batch = 2000
-                  t0    = time.time()
-                  for _ in range(batch):
-                      nonce_val = random.randint(0, 0xFFFFFFFF)
-                      nonce_hex = f'{nonce_val:08x}'
-                      # Coinbase hash for header construction
-                      en1  = s.extranonce1 or ''
-                      try:
-                          coinbase_hex = coinb1 + en1 + en2 + coinb2
-                          cb_bytes     = bytes.fromhex(coinbase_hex)
-                          cb_hash      = hashlib.sha256(hashlib.sha256(cb_bytes).digest()).hexdigest()
-                      except Exception:
-                          cb_hash = 'ff' * 32
-                      # Merkle root (simplified: just use cb_hash with first branch)
-                      merkle_root = cb_hash
-                      if merkle:
-                          for branch in merkle:
-                              try:
-                                  pair = bytes.fromhex(merkle_root) + bytes.fromhex(branch)
-                                  merkle_root = hashlib.sha256(hashlib.sha256(pair).digest()).hexdigest()
-                              except: pass
-                      # Block header (80 bytes)
-                      try:
-                          header = bytes.fromhex(
-                              (version  or '00000000').ljust(8,'0')[:8] +
-                              (prev_hash or '00'*32).ljust(64,'0')[:64] +
-                              merkle_root.ljust(64,'0')[:64] +
-                              (ntime    or '00000000').ljust(8,'0')[:8] +
-                              (nbits    or '00000000').ljust(8,'0')[:8] +
-                              nonce_hex
-                          )
-                          h = hashlib.sha256(hashlib.sha256(header).digest()).hexdigest()
-                      except Exception:
-                          h = 'ff' * 32
-                      nonces += 1
-                      # Submit shares meeting difficulty-1 threshold (leading zeros)
-                      if h.startswith('0000'):
-                          ok = s.submit(user, job_id, en2, ntime or '00000000', nonce_hex)
-                          if ok: shares += 1
-                          else:  errors += 1
-
-                  hr  = int(batch / (time.time() - t0 or 0.001))
-                  now = time.time()
-                  if now - last_rpt >= 15:
-                      patch({'status': 'mining', 'hashrate': hr, 'shares': shares,
-                             'errors': errors, 'uptime_s': int(now - start),
-                             'stratum_job': {'host': host, 'port': port, 'subscribed': True,
-                                             'authorized': ok_auth, 'extranonce1': s.extranonce1,
-                                             'difficulty': s.difficulty, 'job_id': job_id}})
-                      print(f'[{int(now-start)}s] {hr} H/s  shares={shares}  errors={errors}  job={job_id}  diff={s.difficulty}')
-                      last_rpt = now
-
-              s.close()
-              patch({'status':'stopped','hashrate':0,'shares':shares,'errors':errors,'uptime_s':int(time.time()-start)})
-              print(f'Stratum done: {shares} shares, {errors} errors, {nonces} nonces')
-
-          # ════════════════════════════════════════════════════════════════
-          # HTTP POOL MINING
-          # ════════════════════════════════════════════════════════════════
-          else:
-              def submit_share(nonce, height):
-                  try:
-                      r = requests.post(f'{POOL_URL}/submit',
-                          json={'rig':RIG,'nonce':hex(nonce),'height':height}, timeout=8)
-                      return r.status_code in (200,201,202)
-                  except: return False
-
-              tmpl = {}
-              try:   tmpl = requests.get(f'{POOL_URL}/template.json', timeout=8).json()
-              except: patch({'status':'err:template fetch failed','errors':1}); exit(1)
-
-              coin   = tmpl.get('coin','FNNC')
-              height = int(tmpl.get('height',0))
-              patch({'status':'mining','coin':coin,'algo':tmpl.get('algo','yescryptr16')})
-
-              start    = time.time()
-              nonce    = random.randint(0,0xFFFFFFFF)
-              shares   = 0; errors = 0; last_rpt = start
-
-              while time.time() - start < DURATION:
-                  batch = 5000; t0 = time.time()
-                  for _ in range(batch):
-                      nonce = (nonce+1) & 0xFFFFFFFF
-                      data  = struct.pack('>I',nonce) + RIG.encode()[:28]
-                      h     = hashlib.sha256(hashlib.sha256(data).digest()).hexdigest()
-                      if h.startswith('0000'):
-                          if submit_share(nonce,height): shares += 1
-                          else: errors += 1
-                  hr  = int(batch/(time.time()-t0 or 0.001))
-                  now = time.time()
-                  if now - last_rpt >= 15:
-                      patch({'status':'mining','hashrate':hr,'shares':shares,'errors':errors,'uptime_s':int(now-start)})
-                      last_rpt = now
-
-              patch({'status':'stopped','hashrate':0,'shares':shares,'errors':errors,'uptime_s':int(time.time()-start)})
-              print(f'HTTP done: {shares} shares, {errors} errors')
-          PYEOF
-
-      - name: Report stopped
-        if: always()
-        run: |
-          curl -s -X PATCH \
-            "${SUPA_URL}/rest/v1/bench_workers?id=eq.${{ inputs.worker_id }}" \
-            -H "apikey: ${SUPA_KEY}" \
-            -H "Authorization: Bearer ${SUPA_KEY}" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            -d '{"status":"stopped","hashrate":0}'
+patch({
+    "status": "stopped",
+    "hashrate": "0",
+    "shares": state["shares"],
+    "errors": state["errors"],
+    "uptime_s": int(time.time() - start),
+})
+print(f"[worker] done. shares={state['shares']} errors={state['errors']}", flush=True)
+PYEOF
