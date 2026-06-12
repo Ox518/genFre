@@ -1104,6 +1104,7 @@ function renderAssignments() {
           <div class="assign-chip" data-worker-id="${w.id}" draggable="true" title="${esc(w.status||'idle')}">
             <span>${esc(w.rig_id||w.id.slice(0,8))}</span>
             <button onclick="unassignWorker('${w.id}')" style="background:none;border:none;color:var(--fg2);cursor:pointer;font-size:10px;padding:0 2px;line-height:1" title="Unassign">✕</button>
+            <button onclick="dispatchFromAssignment('${w.id}')" style="background:none;border:none;color:var(--accent,#4a9);cursor:pointer;font-size:10px;padding:0 2px;line-height:1" title="Dispatch this worker now">▶</button>
           </div>`).join('') : '<span style="font-size:10px;color:#555;padding:4px">drop workers here</span>'}
       </div>`;
     // Drop target events
@@ -1183,6 +1184,40 @@ async function unassignWorker(workerId) {
   await loadAll();
 }
 
+
+async function dispatchFromAssignment(workerId) {
+  const worker = workers.find(w => w.id === workerId);
+  if (!worker) return;
+  const pool = pools.find(p => p.id === assignments[workerId]);
+  if (!pool) { log('No pool assigned to this worker', 'err'); return; }
+  const pat = getPat();
+  if (!pat) { alert('Enter your GitHub PAT in Settings first.'); return; }
+  const duration = 30;
+  log(`Dispatching ${worker.rig_id} → ${pool.name}...`);
+  // Update worker record
+  await db.from('bench_workers').update({ status:'dispatching', pool_url: pool.url }).eq('id', workerId);
+  const r = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WF}/dispatches`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref:'main', inputs:{
+      worker_id: workerId,
+      pool_url:  pool.url,
+      rig_id:    worker.rig_id || 'bench-rig',
+      duration_minutes: String(duration),
+      stratum_user: pool.stratum_user || '',
+      stratum_pass: pool.stratum_pass || 'x'
+    }})
+  });
+  if (r.status === 204) {
+    log(`✓ Dispatched ${worker.rig_id} → ${pool.name}`, 'ok');
+    dispatchedRuns[workerId] = { rig_id: worker.rig_id, dispatched_at: new Date().toISOString() };
+  } else {
+    log(`✗ Dispatch failed: ${r.status}`, 'err');
+    await db.from('bench_workers').update({ status:'err:dispatch' }).eq('id', workerId);
+  }
+  await loadAll();
+}
+
 async function clearAllAssignments() {
   if (!confirm('Clear all worker assignments?')) return;
   await db.from('bench_assignments').delete().neq('worker_id','00000000-0000-0000-0000-000000000000');
@@ -1221,6 +1256,12 @@ async function runAutoAssign() {
       await db.from('bench_workers').update({ pool_url: available.url }).eq('id', w.id);
     }
     log(`Auto-assigned ${unassigned.length} worker(s) → ${available.name}`, 'ok');
+    // Dispatch any newly assigned idle workers
+    for (const w of unassigned) {
+      if (!w.status || w.status === 'idle' || w.status === 'stopped') {
+        await dispatchFromAssignment(w.id);
+      }
+    }
     await loadAll();
   } finally {
     _autoAssignRunning = false;
@@ -1377,7 +1418,23 @@ async function dispatchWorker() {
   if (!pat) { alert('Enter your GitHub PAT in Settings first.'); return; }
   const rig      = document.getElementById('acq-rig').value.trim() || 'bench-rig';
   const duration = parseInt(document.getElementById('acq-duration').value) || 30;
-  const poolUrl  = document.getElementById('acq-pool-url').value.trim() || getPoolUrl();
+  // Resolve pool URL: acq-pool-url field → assigned pool for this rig → settings default
+  let poolUrl = document.getElementById('acq-pool-url').value.trim();
+  if (!poolUrl) {
+    // Check if any pool is assigned to a worker with this rig_id
+    const existingWorker = workers.find(w => w.rig_id === rig);
+    if (existingWorker && assignments[existingWorker.id]) {
+      const assignedPool = pools.find(p => p.id === assignments[existingWorker.id]);
+      if (assignedPool) poolUrl = assignedPool.url;
+    }
+    // Fall back to first available (reachable) pool
+    if (!poolUrl) {
+      const firstPool = pools.find(p => { const tr = p.test_result||{}; return tr.reachable||tr.subscribed; }) || pools[0];
+      if (firstPool) poolUrl = firstPool.url;
+    }
+    if (!poolUrl) poolUrl = getPoolUrl();
+  }
+  const assignedPool = pools.find(p => p.url === poolUrl);
   // BUG 4 FIX: wrap bench_workers insert in try/catch, surface errors
   let w;
   try {
@@ -1395,7 +1452,14 @@ async function dispatchWorker() {
     const r = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WF}/dispatches`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ref:'main', inputs:{ worker_id:w.id, pool_url:poolUrl, rig_id:rig, duration_minutes:String(duration) } })
+      body: JSON.stringify({ ref:'main', inputs:{
+        worker_id: w.id,
+        pool_url:  poolUrl,
+        rig_id:    rig,
+        duration_minutes: String(duration),
+        stratum_user: assignedPool?.stratum_user || '',
+        stratum_pass: assignedPool?.stratum_pass || 'x'
+      } })
     });
     if (r.status === 204) {
       log(`✓ Dispatched ${rig} — ${w.id.slice(0,8)}`, 'ok');
