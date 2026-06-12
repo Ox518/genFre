@@ -247,7 +247,12 @@ a{color:var(--accent2)}
   <div class="modal">
     <h3>Add Pool</h3>
     <div class="field"><label>Pool Name</label><input id="ap-name" placeholder="GenFre Pool"></div>
-    <div class="field"><label>Pool URL</label><input id="ap-url" placeholder="https://ox518.github.io/genFre"></div>
+    <div class="field"><label>Pool URL</label><input id="ap-url" placeholder="https://pool.example.com  or  stratum+tcp://pool.example.com:3333" oninput="document.getElementById('ap-stratum-fields').style.display=this.value.startsWith('stratum')?'block':'none'"></div>
+    <div id="ap-stratum-fields" style="display:none;border-top:1px solid #333;padding-top:8px;margin-bottom:4px">
+      <div style="font-size:10px;color:var(--orange);margin-bottom:6px">⚡ Stratum fields</div>
+      <div class="field"><label>Stratum User <span style="font-size:10px;color:var(--fg2)">(wallet.worker)</span></label><input id="ap-stratum-user" placeholder="yourwallet.worker1"></div>
+      <div class="field"><label>Stratum Password</label><input id="ap-stratum-pass" placeholder="x" value="x"></div>
+    </div>
     <div class="field"><label>Username / Address</label><input id="ap-user" placeholder="your-wallet-address"></div>
     <div class="field"><label>Password</label><input id="ap-pass" type="password" placeholder="x"></div>
     <div class="field"><label>Coin</label>
@@ -991,7 +996,7 @@ function subscribeRealtime() {
         const tr = p.test_result || {};
         if (tr.hasOwnProperty('reachable')) {
           const emoji = tr.reachable ? '🟢' : '🔴';
-          const status = tr.reachable ? `up | ${tr.latency_ms}ms | h=${tr.height||'?'}` : 'down';
+          const status = (tr.reachable||tr.subscribed) ? (tr.protocol==='stratum' ? `stratum | ${tr.total_ms||tr.latency_ms}ms | auth:${tr.authorized?'✓':'✗'}` : `up | ${tr.latency_ms}ms | h=${tr.height||'?'}`) : 'down';
           notifyDiscord(`${emoji} Pool **${p.name}** ${status}`);
         }
       }
@@ -1046,14 +1051,14 @@ function renderPools() {
   tb.innerHTML = '';
   pools.forEach(p => {
     const tr = p.test_result || {};
-    const ok   = tr.reachable ? '<span class="tag-ok">✓</span>' : (tr.hasOwnProperty('reachable') ? '<span class="tag-fail">✗</span>' : '—');
-    const auth = tr.auth_ok===true ? '<span class="tag-ok">✓</span>' : (tr.auth_ok===false ? '<span class="tag-fail">✗</span>' : '—');
+    const ok   = (tr.reachable||tr.subscribed) ? '<span class="tag-ok">✓</span>' : (tr.hasOwnProperty('reachable') ? '<span class="tag-fail">✗</span>' : '—');
+    const auth = (tr.auth_ok||tr.authorized)===true ? '<span class="tag-ok">✓</span>' : ((tr.auth_ok||tr.authorized)===false && (tr.hasOwnProperty('auth_ok')||tr.hasOwnProperty('authorized')) ? '<span class="tag-fail">✗</span>' : '—');
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${esc(p.name)}</td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(p.url)}</td>
       <td>${esc(p.coin||'')}</td>
-      <td>${ok}</td><td>${tr.height||'—'}</td>
+      <td>${ok}</td><td>${tr.protocol==='stratum'?(tr.job?`job:${tr.job.job_id||'?'} diff:${tr.difficulty||'?'}`:(tr.subscribed?'subscribed':'—')):(tr.height||'—')}</td>
       <td>${tr.latency_ms ? tr.latency_ms+'ms' : '—'}</td><td>${auth}</td>
       <td>
         <button class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="testPoolById('${p.id}')">Test</button>
@@ -1202,12 +1207,19 @@ document.getElementById('ap-save').addEventListener('click', async () => {
   const url = document.getElementById('ap-url').value.trim();
   if (!url) { alert('URL required'); return; }
   const name = document.getElementById('ap-name').value.trim() || url;
+  const _isSt = url.startsWith('stratum');
+  const _stm  = _isSt && url.match(/stratum\+tcp:\/\/([^:]+):(\d+)/i);
   await db.from('bench_pools').insert({
     name, url: url.replace(/\/$/, ''),
     username: document.getElementById('ap-user').value.trim(),
     password: document.getElementById('ap-pass').value.trim(),
     coin:     document.getElementById('ap-coin').value,
-    user_id:  session.user.id
+    user_id:  session.user.id,
+    protocol:     _isSt ? 'stratum' : 'http',
+    stratum_host: _stm  ? _stm[1]           : null,
+    stratum_port: _stm  ? parseInt(_stm[2])  : null,
+    stratum_user: _isSt ? (document.getElementById('ap-stratum-user')?.value.trim()||null) : null,
+    stratum_pass: _isSt ? (document.getElementById('ap-stratum-pass')?.value.trim()||'x')  : null
   });
   closeModal('modal-add-pool');
   await loadAll();
@@ -1226,7 +1238,48 @@ async function testPoolById(id) {
   const pool = pools.find(p=>p.id===id);
   if (!pool) return;
   log(`Testing ${pool.name}...`);
-  const token  = session.access_token;
+  const token     = session.access_token;
+  const isStratum = (pool.protocol === 'stratum') || !!(pool.url && pool.url.startsWith('stratum'));
+
+  if (isStratum) {
+    const host = pool.stratum_host || pool.url.replace(/stratum\+tcp:\/\//i,'').split(':')[0];
+    const port = pool.stratum_port || parseInt((pool.url||'').split(':').pop()) || 3333;
+    const user = pool.stratum_user || 'gitmine.test';
+    const pass = pool.stratum_pass || 'x';
+    log(`Stratum handshake → ${host}:${port} user=${user}`, 'info');
+    let result = { reachable:false, protocol:'stratum', latency_ms:null, total_ms:null,
+      subscribed:false, authorized:false, extranonce1:null, extranonce2_size:null,
+      difficulty:null, job:null, auth_ok:false, errors:[] };
+    try {
+      const r = await fetch(RELAY+'/stratum-session', {
+        method:'POST',
+        headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' },
+        body: JSON.stringify({ host, port, user, pass, algo: pool.coin||'unknown' })
+      });
+      const d = await r.json();
+      result.reachable        = !!d.subscribed;
+      result.subscribed       = !!d.subscribed;
+      result.authorized       = !!d.authorized;
+      result.auth_ok          = !!d.authorized;
+      result.latency_ms       = d.latency_ms;
+      result.total_ms         = d.total_ms;
+      result.extranonce1      = d.extranonce1;
+      result.extranonce2_size = d.extranonce2_size;
+      result.difficulty       = d.difficulty;
+      result.job              = d.job;
+      if (d.error) result.errors.push(d.error);
+      const status = d.subscribed
+        ? (d.authorized ? `✓ auth OK | job:${d.job?.job_id||'?'} | diff:${d.difficulty||'?'}` : `✓ subscribed, auth pending`)
+        : `✗ subscribe failed`;
+      log(`${pool.name}: ${status} (${d.total_ms}ms)`, d.subscribed ? 'ok' : 'err');
+      if (d.job) log(`  extranonce1=${d.extranonce1} size=${d.extranonce2_size} ntime=${d.job.ntime} nbits=${d.job.nbits}`, 'info');
+    } catch(e) { result.errors.push(String(e).slice(0,80)); log(`Stratum test error: ${e.message}`, 'err'); }
+    await db.from('bench_pools').update({ test_result: result }).eq('id',id);
+    await loadAll();
+    return;
+  }
+
+  // HTTP pool
   const result = { reachable:false, protocol:null, latency_ms:null, coin:null, algo:null, height:null, auth_ok:null, errors:[] };
   try {
     const t0 = Date.now();
