@@ -168,6 +168,11 @@ a{color:var(--accent2)}
         <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px" onclick="saveDiscordWebhook()">Save Webhook</button>
         <div id="discord-status" style="font-size:10px;color:var(--fg2);margin-top:2px"></div>
       </div>
+      <div class="stat-row" style="flex-direction:column;gap:4px;margin-top:12px">
+        <label style="color:var(--fg2);font-size:10px">Database</label>
+        <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="reloadSchemaCache()">↺ Reload Schema Cache</button>
+        <div id="schema-cache-status" style="font-size:10px;color:var(--fg2);margin-top:2px"></div>
+      </div>
     </div>
 
     <div id="main">
@@ -879,6 +884,25 @@ function saveDiscordWebhook() {
 function getPat()             { return localStorage.getItem('gm_gh_pat') || ''; }
 function getPoolUrl()         { return localStorage.getItem('gm_pool_url') || DEFAULT_POOL; }
 function getDiscordWebhook()  { return localStorage.getItem('gm_discord_webhook') || ''; }
+
+async function reloadSchemaCache() {
+  const btn = document.querySelector('[onclick="reloadSchemaCache()"]');
+  const statusEl = document.getElementById('schema-cache-status');
+  if (btn) btn.textContent = '↺ Reloading...';
+  if (statusEl) statusEl.textContent = '';
+  try {
+    const { data, error } = await db.rpc('reload_schema_cache');
+    if (error) throw error;
+    const ts = data?.reloaded_at ? new Date(data.reloaded_at).toLocaleTimeString() : new Date().toLocaleTimeString();
+    if (statusEl) { statusEl.textContent = '✓ Reloaded ' + ts; statusEl.style.color = 'var(--green)'; }
+    log('✓ Schema cache reloaded', 'ok');
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '✗ ' + (e.message||String(e)).slice(0,60); statusEl.style.color = 'var(--red)'; }
+    log('Schema cache reload failed: ' + (e.message||String(e)), 'err');
+  } finally {
+    if (btn) btn.textContent = '↺ Reload Schema Cache';
+  }
+}
 
 // ── Discord notification helper ───────────────────────────────────────────────
 async function notifyDiscord(content) {
