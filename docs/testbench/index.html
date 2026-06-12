@@ -1192,6 +1192,11 @@ async function unassignWorker(workerId) {
 async function dispatchFromAssignment(workerId, poolIdOverride) {
   const worker = workers.find(w => w.id === workerId);
   if (!worker) return;
+  // Only dispatch GHA workers — Wandbox/Archive/Piston have their own execution path
+  if (worker.source && worker.source !== 'github_actions') {
+    log(`${worker.rig_id}: non-GHA worker (${worker.source}) — skipping GHA dispatch`, 'info');
+    return;
+  }
   // Accept a direct poolId override (e.g. from auto-assign before loadAll refreshes)
   const resolvedPid = poolIdOverride || assignments[workerId];
   const pool = pools.find(p => p.id === resolvedPid);
@@ -1424,23 +1429,17 @@ async function dispatchWorker() {
   if (!pat) { alert('Enter your GitHub PAT in Settings first.'); return; }
   const rig      = document.getElementById('acq-rig').value.trim() || 'bench-rig';
   const duration = parseInt(document.getElementById('acq-duration').value) || 30;
-  // Resolve pool URL: acq-pool-url field → assigned pool for this rig → settings default
+  // Resolve pool: acq-pool-url field → first reachable pool → first pool → settings default
   let poolUrl = document.getElementById('acq-pool-url').value.trim();
+  let assignedPool = null;
   if (!poolUrl) {
-    // Check if any pool is assigned to a worker with this rig_id
-    const existingWorker = workers.find(w => w.rig_id === rig);
-    if (existingWorker && assignments[existingWorker.id]) {
-      const assignedPool = pools.find(p => p.id === assignments[existingWorker.id]);
-      if (assignedPool) poolUrl = assignedPool.url;
-    }
-    // Fall back to first available (reachable) pool
-    if (!poolUrl) {
-      const firstPool = pools.find(p => { const tr = p.test_result||{}; return tr.reachable||tr.subscribed; }) || pools[0];
-      if (firstPool) poolUrl = firstPool.url;
-    }
+    // Prefer first reachable pool
+    assignedPool = pools.find(p => { const tr = p.test_result||{}; return tr.reachable||tr.subscribed; }) || pools[0];
+    if (assignedPool) poolUrl = assignedPool.url;
     if (!poolUrl) poolUrl = getPoolUrl();
+  } else {
+    assignedPool = pools.find(p => p.url === poolUrl);
   }
-  const assignedPool = pools.find(p => p.url === poolUrl);
   // BUG 4 FIX: wrap bench_workers insert in try/catch, surface errors
   let w;
   try {
