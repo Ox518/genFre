@@ -1173,6 +1173,10 @@ async function assignWorker(workerId, poolId) {
   // Also update pool_url on the worker row so dispatch picks it up
   await db.from('bench_workers').update({ pool_url: pool.url }).eq('id', workerId);
   log(`Assigned ${worker.rig_id||workerId} → ${pool.name}`, 'ok');
+  // Auto-dispatch if worker is idle/stopped
+  if (!worker.status || worker.status === 'idle' || worker.status === 'stopped') {
+    await dispatchFromAssignment(workerId, pool.id);
+  }
   await loadAll();
 }
 
@@ -1185,11 +1189,13 @@ async function unassignWorker(workerId) {
 }
 
 
-async function dispatchFromAssignment(workerId) {
+async function dispatchFromAssignment(workerId, poolIdOverride) {
   const worker = workers.find(w => w.id === workerId);
   if (!worker) return;
-  const pool = pools.find(p => p.id === assignments[workerId]);
-  if (!pool) { log('No pool assigned to this worker', 'err'); return; }
+  // Accept a direct poolId override (e.g. from auto-assign before loadAll refreshes)
+  const resolvedPid = poolIdOverride || assignments[workerId];
+  const pool = pools.find(p => p.id === resolvedPid);
+  if (!pool) { log(`No pool assigned to ${worker.rig_id||workerId}`, 'err'); return; }
   const pat = getPat();
   if (!pat) { alert('Enter your GitHub PAT in Settings first.'); return; }
   const duration = 30;
@@ -1256,10 +1262,10 @@ async function runAutoAssign() {
       await db.from('bench_workers').update({ pool_url: available.url }).eq('id', w.id);
     }
     log(`Auto-assigned ${unassigned.length} worker(s) → ${available.name}`, 'ok');
-    // Dispatch any newly assigned idle workers
+    // Dispatch any newly assigned idle workers — pass poolId directly (assignments map not yet refreshed)
     for (const w of unassigned) {
       if (!w.status || w.status === 'idle' || w.status === 'stopped') {
-        await dispatchFromAssignment(w.id);
+        await dispatchFromAssignment(w.id, available.id);
       }
     }
     await loadAll();
