@@ -1193,6 +1193,7 @@ async function clearAllAssignments() {
 
 // ── Auto-assign ──────────────────────────────────────────────────────────
 let _autoAssign = false;
+let _autoAssignRunning = false;  // guard against re-entrant calls
 
 function onAutoAssignToggle(checked) {
   _autoAssign = checked;
@@ -1200,8 +1201,7 @@ function onAutoAssignToggle(checked) {
 }
 
 async function runAutoAssign() {
-  if (!_autoAssign) return;
-  // First available pool = first pool that is reachable (or just first pool if none tested)
+  if (!_autoAssign || _autoAssignRunning) return;
   const available = pools.find(p => {
     const tr = p.test_result || {};
     return tr.reachable || tr.subscribed;
@@ -1209,25 +1209,29 @@ async function runAutoAssign() {
   if (!available) { log('Auto-assign: no pools available', 'warn'); return; }
 
   const unassigned = workers.filter(w => !assignments[w.id]);
-  if (!unassigned.length) return;
+  if (!unassigned.length) return;  // nothing to do — do NOT call loadAll
 
-  for (const w of unassigned) {
-    await db.from('bench_assignments').upsert(
-      { worker_id: w.id, pool_id: available.id, assigned_by: session.user.id },
-      { onConflict: 'worker_id' }
-    );
-    await db.from('bench_workers').update({ pool_url: available.url }).eq('id', w.id);
+  _autoAssignRunning = true;
+  try {
+    for (const w of unassigned) {
+      await db.from('bench_assignments').upsert(
+        { worker_id: w.id, pool_id: available.id, assigned_by: session.user.id },
+        { onConflict: 'worker_id' }
+      );
+      await db.from('bench_workers').update({ pool_url: available.url }).eq('id', w.id);
+    }
+    log(`Auto-assigned ${unassigned.length} worker(s) → ${available.name}`, 'ok');
+    await loadAll();
+  } finally {
+    _autoAssignRunning = false;
   }
-  log(`Auto-assigned ${unassigned.length} worker(s) → ${available.name}`, 'ok');
-  await loadAll();
 }
 
 function renderAll() {
   renderWorkers(); renderPools(); renderAssignments(); renderSidebar(); renderPipeline();
-  // Sync checkbox state, then run auto-assign if enabled
+  // Sync checkbox visual state only — never trigger runAutoAssign from here
   const chk = document.getElementById('chk-auto-assign');
   if (chk) chk.checked = _autoAssign;
-  if (_autoAssign) runAutoAssign();
 }
 
 function renderWorkers() {
