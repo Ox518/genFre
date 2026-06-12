@@ -191,7 +191,7 @@ a{color:var(--accent2)}
       </div>
       <div class="stat-row" style="flex-direction:column;gap:4px;margin-top:8px">
         <label style="color:var(--fg2);font-size:10px">Pool URL</label>
-        <input id="pool-url-setting" placeholder="https://ox518.github.io/genFre" style="background:var(--bg3);color:var(--fg);border:1px solid #333;padding:4px 8px;border-radius:4px;font-family:var(--font);font-size:11px;width:100%">
+        <input id="pool-url-setting" placeholder="stratum+tcp://americas.mining-dutch.nl:9983" style="background:var(--bg3);color:var(--fg);border:1px solid #333;padding:4px 8px;border-radius:4px;font-family:var(--font);font-size:11px;width:100%">
         <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px" onclick="savePoolUrl()">Save URL</button>
       </div>
       <div class="stat-row" style="flex-direction:column;gap:4px;margin-top:8px">
@@ -225,7 +225,7 @@ a{color:var(--accent2)}
             <div class="acq-form">
               <div class="acq-field"><label>Rig Name</label><input id="acq-rig" placeholder="bench-rig-01" value="bench-rig-01"></div>
               <div class="acq-field"><label>Duration (minutes)</label><input id="acq-duration" type="number" value="30" min="1" max="350" style="min-width:80px"></div>
-              <div class="acq-field"><label>Pool URL</label><input id="acq-pool-url" placeholder="https://ox518.github.io/genFre" style="min-width:260px"></div>
+              <div class="acq-field"><label>Pool URL</label><input id="acq-pool-url" placeholder="stratum+tcp://americas.mining-dutch.nl:9983" style="min-width:260px"></div>
               <button class="btn btn-orange" style="align-self:flex-end" onclick="dispatchWorker()">Dispatch via GitHub Actions</button>
             </div>
           </div>
@@ -335,7 +335,7 @@ const RELAY     = `${SUPA_URL}/functions/v1/bench-relay`;
 const GH_REPO   = 'Ox518/genFre';
 const GH_WF     = 'bench-worker.yml';
 const RAW_BASE  = 'https://raw.githubusercontent.com/Ox518/genFre/main';
-const DEFAULT_POOL = 'https://ox518.github.io/genFre';
+const DEFAULT_POOL = 'stratum+tcp://americas.mining-dutch.nl:9983';
 
 const { createClient } = supabase;
 const db = createClient(SUPA_URL, SUPA_KEY);
