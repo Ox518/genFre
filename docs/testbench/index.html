@@ -748,27 +748,84 @@ const PLATFORMS = [
 
 // ── Miner script generators ──────────────────────────────────────────────────
 
-function pistonMinerScript(rig, poolUrl) {
-  return `import requests,time,hashlib,struct,random
-RIG='${rig}';POOL='${poolUrl}';START=time.time();NONCE=random.randint(0,0xFFFFFFFF)
-SHARES=0;ERRORS=0
+function pistonMinerScript(rig, poolUrl, stratumUser, stratumPass) {
+  // Parse stratum+tcp://host:port OR fall back to host:port default
+  const isStratum = poolUrl.startsWith('stratum');
+  const stratumMatch = poolUrl.match(/stratum\+tcp:\/\/([^:]+):(\d+)/);
+  const host = stratumMatch ? stratumMatch[1] : 'americas.mining-dutch.nl';
+  const port = stratumMatch ? stratumMatch[2] : '9983';
+  const user = stratumUser || (rig + '@gitmine');
+  const pass = stratumPass || 'x';
+  return `import socket,json,hashlib,struct,random,time,re
+HOST='${host}';PORT=${port};USER='${user}';PASS='${pass}';RIG='${rig}'
+DURATION=25
+buf=b'';shares=0;errors=0;job=None;en1='';en2_size=4;diff=1.0;_id=0
+def send(sock,obj):
+    sock.sendall((json.dumps(obj)+'\\n').encode())
+def readline(sock):
+    global buf
+    while b'\\n' not in buf:
+        c=sock.recv(4096)
+        if not c:raise ConnectionError('disconnected')
+        buf+=c
+    line,buf=buf.split(b'\\n',1)
+    return json.loads(line.decode())
+def drain(sock,n=15,t=10):
+    sock.settimeout(t);msgs=[]
+    try:
+        for _ in range(n):msgs.append(readline(sock))
+    except socket.timeout:pass
+    return msgs
 try:
-  tmpl=requests.get(POOL+'/template.json',timeout=8).json()
-  HEIGHT=tmpl.get('height',0)
-  print(f"Template ok h={HEIGHT}")
+    sock=socket.create_connection((HOST,PORT),timeout=15)
+    sock.settimeout(30)
+    _id+=1;send(sock,{'id':_id,'method':'mining.subscribe','params':['gitmine/1.0']})
+    r=readline(sock)
+    if r.get('result') and len(r['result'])>=3:
+        en1=r['result'][1] or '';en2_size=r['result'][2] or 4
+    print(f'subscribed en1={en1} en2_size={en2_size}')
+    _id+=1;aid=_id;send(sock,{'id':aid,'method':'mining.authorize','params':[USER,PASS]})
+    for msg in drain(sock,15,15):
+        if msg.get('method')=='mining.set_difficulty':diff=float(msg['params'][0])
+        elif msg.get('method')=='mining.notify':job=msg['params']
+        elif msg.get('id')==aid:print(f'auth={msg.get("result")}')
+    print(f'diff={diff} job={job[0] if job else None}')
+    start=time.time()
+    while time.time()-start<DURATION:
+        if not job:
+            sock.settimeout(5)
+            try:
+                for _ in range(10):
+                    m=readline(sock)
+                    if m.get('method')=='mining.notify':job=m['params']
+                    elif m.get('method')=='mining.set_difficulty':diff=float(m['params'][0])
+            except socket.timeout:pass
+        if not job:time.sleep(1);continue
+        job_id,prev,cb1,cb2,merkle,ver,nbits,ntime,clean=(job+[None]*9)[:9]
+        en2=format(random.randint(0,(1<<en2_size*8)-1),f'0{en2_size*2}x')
+        for _ in range(500):
+            nonce_val=random.randint(0,0xFFFFFFFF);nonce_hex=f'{nonce_val:08x}'
+            try:
+                cb=bytes.fromhex((cb1 or '')+(en1 or '')+en2+(cb2 or ''))
+                cbh=hashlib.sha256(hashlib.sha256(cb).digest()).hexdigest()
+                mr=cbh
+                for b in (merkle or []):
+                    try:mr=hashlib.sha256(hashlib.sha256(bytes.fromhex(mr)+bytes.fromhex(b)).digest()).hexdigest()
+                    except:pass
+                hdr=bytes.fromhex((ver or '00000000').ljust(8,'0')[:8]+(prev or '0'*64).ljust(64,'0')[:64]+mr.ljust(64,'0')[:64]+(ntime or '00000000').ljust(8,'0')[:8]+(nbits or '00000000').ljust(8,'0')[:8]+nonce_hex)
+                h=hashlib.sha256(hashlib.sha256(hdr).digest()).hexdigest()
+                if h[:6]=='000000':
+                    _id+=1;send(sock,{'id':_id,'method':'mining.submit','params':[USER,job_id,en2,ntime,nonce_hex]})
+                    try:
+                        resp=readline(sock)
+                        if resp.get('result'):shares+=1;print(f'SHARE accepted shares={shares}')
+                        else:errors+=1;print(f'share rejected: {resp.get("error")}')
+                    except:errors+=1
+            except:errors+=1
+    sock.close()
 except Exception as e:
-  print(f"Template fail: {e}");HEIGHT=0
-while time.time()-START<25:
-  for _ in range(3000):
-    NONCE=(NONCE+1)&0xFFFFFFFF
-    h=hashlib.sha256(hashlib.sha256(struct.pack('>I',NONCE)+RIG.encode()).digest()).hexdigest()
-    if h[:4]=='0000':
-      try:
-        r=requests.post(POOL+'/submit',json={'rig':RIG,'nonce':hex(NONCE),'height':HEIGHT},timeout=5)
-        if r.status_code in(200,201,202):SHARES+=1
-        else:ERRORS+=1
-      except:ERRORS+=1
-print(f"Done rig={RIG} shares={SHARES} errors={ERRORS}")
+    print(f'ERROR: {e}');errors+=1
+print(f'Done rig={RIG} shares={shares} errors={errors}')
 `;
 }
 
