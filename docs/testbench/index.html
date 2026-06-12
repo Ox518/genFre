@@ -264,6 +264,10 @@ a{color:var(--accent2)}
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
           <span style="font-size:13px;font-weight:600;color:var(--fg1)">Pool Assignments</span>
           <span style="font-size:11px;color:var(--fg2);flex:1">Drag a worker onto a pool — or use the dropdowns.</span>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;user-select:none;color:var(--fg1)" title="Automatically assign every unassigned worker to the first available (reachable) pool whenever workers or pools change">
+            <input type="checkbox" id="chk-auto-assign" style="accent-color:var(--accent);width:14px;height:14px" onchange="onAutoAssignToggle(this.checked)">
+            Auto-assign
+          </label>
           <button class="btn btn-ghost" style="font-size:11px;padding:3px 10px" onclick="clearAllAssignments()">Clear All</button>
         </div>
 
@@ -1186,7 +1190,45 @@ async function clearAllAssignments() {
   await loadAll();
 }
 
-function renderAll() { renderWorkers(); renderPools(); renderAssignments(); renderSidebar(); renderPipeline(); }
+
+// ── Auto-assign ──────────────────────────────────────────────────────────
+let _autoAssign = false;
+
+function onAutoAssignToggle(checked) {
+  _autoAssign = checked;
+  if (checked) runAutoAssign();
+}
+
+async function runAutoAssign() {
+  if (!_autoAssign) return;
+  // First available pool = first pool that is reachable (or just first pool if none tested)
+  const available = pools.find(p => {
+    const tr = p.test_result || {};
+    return tr.reachable || tr.subscribed;
+  }) || pools[0];
+  if (!available) { log('Auto-assign: no pools available', 'warn'); return; }
+
+  const unassigned = workers.filter(w => !assignments[w.id]);
+  if (!unassigned.length) return;
+
+  for (const w of unassigned) {
+    await db.from('bench_assignments').upsert(
+      { worker_id: w.id, pool_id: available.id, assigned_by: session.user.id },
+      { onConflict: 'worker_id' }
+    );
+    await db.from('bench_workers').update({ pool_url: available.url }).eq('id', w.id);
+  }
+  log(`Auto-assigned ${unassigned.length} worker(s) → ${available.name}`, 'ok');
+  await loadAll();
+}
+
+function renderAll() {
+  renderWorkers(); renderPools(); renderAssignments(); renderSidebar(); renderPipeline();
+  // Sync checkbox state, then run auto-assign if enabled
+  const chk = document.getElementById('chk-auto-assign');
+  if (chk) chk.checked = _autoAssign;
+  if (_autoAssign) runAutoAssign();
+}
 
 function renderWorkers() {
   const el = document.getElementById('worker-cards');
