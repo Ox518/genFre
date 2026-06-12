@@ -272,45 +272,50 @@ function debounce(fn, ms) {
 const debouncedLoadAll = debounce(loadAll, 400);
 
 // ── Platform definitions ─────────────────────────────────────────────────────
-// FIX NOTES:
-//   Piston  — no Authorization header; use emkc.org v2 directly
-//   Wandbox — correct payload: {compiler, code} (not files array)
-//   Archive — form POST to archive.org/upload/, not S3 PUT
-//   IPFS    — moved to Tier 2 (web3.storage requires token)
-//   JSONbin — moved to Tier 2 (requires free API key)
-
 const PLATFORMS = [
   // ── TIER 1 ──────────────────────────────────────────────────────────────────
   {
     id:'piston', tier:1, name:'Piston', type:'code-exec', tokenLabel:null,
     free:'Unlimited runs, 30s timeout', maxWorkers:20,
     dispatch: async (rig, poolUrl) => {
-      // No auth header — emkc.org v2 is public
-      const r = await fetch('https://emkc.org/api/v2/piston/execute', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          language:'python', version:'3.10.0',
-          files:[{name:'miner.py', content:pistonMinerScript(rig, poolUrl)}]
-        })
-      });
-      if (!r.ok) throw new Error(`Piston ${r.status}`);
-      const d = await r.json();
-      const out = (d.run?.stdout||'').slice(0,120);
-      return {source:'piston', note: out || '30s window'};
+      // Primary: emkc.org — no auth header required
+      // Fallback: piston.lao.sb if primary returns non-200
+      const PISTON_HOSTS = [
+        'https://emkc.org/api/v2/piston/execute',
+        'https://piston.lao.sb/api/v2/piston/execute'
+      ];
+      let lastErr;
+      for (const host of PISTON_HOSTS) {
+        try {
+          const r = await fetch(host, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              language:'python', version:'3.10.0',
+              files:[{name:'miner.py', content:pistonMinerScript(rig, poolUrl)}]
+            })
+          });
+          if (!r.ok) { lastErr = new Error(`Piston ${r.status} (${host})`); continue; }
+          const d = await r.json();
+          const out = (d.run?.stdout||'').slice(0,120);
+          return {source:'piston', note: out || '30s window'};
+        } catch(e) { lastErr = e; }
+      }
+      throw lastErr || new Error('Piston: all hosts failed');
     }
   },
   {
+    // BUG 3 FIX: compiler cpython-3.12.0 -> cpython-3.12.7; add stdin:''
     id:'wandbox', tier:1, name:'Wandbox', type:'code-exec', tokenLabel:null,
     free:'Unlimited, 30s timeout', maxWorkers:10,
     dispatch: async (rig, poolUrl) => {
-      // FIX: compiler + code fields (not files array)
       const r = await fetch('https://wandbox.org/api/compile.json', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
-          compiler: 'cpython-3.12.0',
+          compiler: 'cpython-3.12.7',
           code: pistonMinerScript(rig, poolUrl),
+          stdin: '',
           'compiler-option-raw': '',
           save: false
         })
@@ -324,8 +329,6 @@ const PLATFORMS = [
     id:'tio', tier:1, name:'TIO (Try It Online)', type:'code-exec', tokenLabel:null,
     free:'No rate limit, 60s timeout', maxWorkers:10,
     dispatch: async (rig, poolUrl) => {
-      // TIO requires deflate encoding — unsupported from browser fetch without extra lib.
-      // Record attempt and surface the generated script for manual paste.
       const script = pistonMinerScript(rig, poolUrl);
       const b64 = btoa(unescape(encodeURIComponent(script)));
       return {source:'tio', note:'Script ready — open tio.run/#python', script_b64: b64};
@@ -352,15 +355,19 @@ const PLATFORMS = [
     id:'archive', tier:1, name:'Internet Archive', type:'storage', tokenLabel:null,
     free:'Free anon upload', maxWorkers:5,
     dispatch: async (rig, poolUrl) => {
-      // FIX: use multipart form POST to /upload/ — anon S3 PUT returns 403
+      // Route through bench-relay to avoid CORS block on direct browser POST
       const itemId = `gitmine-bench-${rig}-${Date.now()}`;
+      const token  = session.access_token;
       const form = new FormData();
       form.append('file', new Blob([pistonMinerScript(rig,poolUrl)], {type:'text/plain'}), 'miner.py');
       form.append('identifier', itemId);
       form.append('mediatype', 'texts');
       form.append('subject', 'gitmine;bench');
-      const r = await fetch('https://archive.org/upload/', {method:'POST', body:form});
-      // archive.org upload returns 200 with HTML on success
+      const r = await fetch(RELAY + '/archive-upload', {
+        method:'POST',
+        headers:{'Authorization':'Bearer '+token, 'x-bench-target':'https://archive.org/upload/'},
+        body: form
+      });
       if (!r.ok && r.status !== 302) throw new Error(`Archive.org ${r.status}`);
       return {source:'internet_archive', url:`https://archive.org/details/${itemId}`};
     }
@@ -402,9 +409,17 @@ const PLATFORMS = [
     tokenLabel:'PAT (workflow scope)', tokenKey:'gm_gh_pat',
     free:'2000 min/month free', maxWorkers:20,
     dispatch: async (rig, poolUrl, token) => {
-      const { data: w } = await db.from('bench_workers')
-        .insert({rig_id:rig, user_id:session.user.id, status:'dispatching', source:'github_actions', pool_url:poolUrl})
-        .select().single();
+      // BUG 4 FIX: wrap insert in try/catch and surface error
+      let w;
+      try {
+        const { data, error } = await db.from('bench_workers')
+          .insert({rig_id:rig, user_id:session.user.id, status:'dispatching', source:'github_actions', pool_url:poolUrl})
+          .select().single();
+        if (error) throw error;
+        w = data;
+      } catch(e) {
+        throw new Error(`Worker register failed: ${e.message||JSON.stringify(e)}`);
+      }
       const r = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WF}/dispatches`,{
         method:'POST',
         headers:{'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
@@ -766,7 +781,7 @@ function setPlatStatus(platId, msg, level='info') {
   }
 }
 
-// ── FIX: debounce guard so a single dispatch doesn't double-fire ─────────────
+// ── BUG 1 FIX: dispatch cooldown extended 2s → 3s ───────────────────────────
 const _dispatching = new Set();
 
 async function platformDispatch(platId) {
@@ -782,11 +797,17 @@ async function platformDispatch(platId) {
     setPlatStatus(platId, 'Dispatching...', 'info');
     log(`[${plat.name}] Dispatching ${rig} @ ${poolUrl}...`);
     const result = await plat.dispatch(rig, poolUrl, token);
+    // BUG 4 FIX: wrap bench_workers insert in try/catch, surface errors
     if (!result.worker_id) {
-      await db.from('bench_workers').insert({
-        rig_id:rig, user_id:session.user.id,
-        status:'dispatched', source:result.source||platId, pool_url:poolUrl
-      });
+      try {
+        const { error } = await db.from('bench_workers').insert({
+          rig_id:rig, user_id:session.user.id,
+          status:'dispatched', source:result.source||platId, pool_url:poolUrl
+        });
+        if (error) throw error;
+      } catch(e) {
+        log(`⚠ Worker register failed for ${rig}: ${e.message||JSON.stringify(e)}`, 'warn');
+      }
     }
     const note = result.note ? ` — ${result.note}` : '';
     const urlLink = result.url ? ` <a href="${result.url}" target="_blank">↗ open</a>` : '';
@@ -799,7 +820,7 @@ async function platformDispatch(platId) {
     setPlatStatus(platId, '✗ '+e.message, 'err');
     log(`✗ [${plat?.name||platId}]: ${e.message}`, 'err');
   } finally {
-    setTimeout(()=>_dispatching.delete(platId), 2000);
+    setTimeout(()=>_dispatching.delete(platId), 3000); // extended from 2000
   }
 }
 
@@ -895,8 +916,6 @@ async function loadAll() {
 }
 
 function subscribeRealtime() {
-  // FIX: use debouncedLoadAll so rapid insert+update from a single dispatch
-  // doesn't fire loadAll (and re-render log) twice in quick succession
   db.channel('bench-changes')
     .on('postgres_changes', { event:'*', schema:'public', table:'bench_workers' }, debouncedLoadAll)
     .on('postgres_changes', { event:'*', schema:'public', table:'bench_pools' },   debouncedLoadAll)
@@ -1052,10 +1071,18 @@ async function dispatchWorker() {
   const rig      = document.getElementById('acq-rig').value.trim() || 'bench-rig';
   const duration = parseInt(document.getElementById('acq-duration').value) || 30;
   const poolUrl  = document.getElementById('acq-pool-url').value.trim() || getPoolUrl();
-  const { data: w, error } = await db.from('bench_workers')
-    .insert({ rig_id:rig, user_id:session.user.id, status:'dispatching', source:'github_actions', pool_url:poolUrl })
-    .select().single();
-  if (error || !w) { log('Failed to create worker row: '+(error?.message||'unknown'), 'err'); return; }
+  // BUG 4 FIX: wrap bench_workers insert in try/catch, surface errors
+  let w;
+  try {
+    const { data, error } = await db.from('bench_workers')
+      .insert({ rig_id:rig, user_id:session.user.id, status:'dispatching', source:'github_actions', pool_url:poolUrl })
+      .select().single();
+    if (error) throw error;
+    w = data;
+  } catch(e) {
+    log('Failed to register worker row: '+(e.message||JSON.stringify(e)), 'err');
+    return;
+  }
   log(`Dispatching ${rig} via GitHub Actions (${duration}min)...`);
   try {
     const r = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WF}/dispatches`, {
