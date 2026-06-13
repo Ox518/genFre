@@ -136,9 +136,10 @@ cmd = [
     "--user", SUSER,
     "--pass", SPASS,
     "--threads", "2",
-    "--timeout", "30",
+    "--timeout", "300",
     "--retries", "-1",
-    "--retry-pause", "5",
+    "--retry-pause", "10",
+    "--reconnect",
 ]
 print(f"[worker] launching: {' '.join(cmd)}", flush=True)
 
