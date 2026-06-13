@@ -36,7 +36,6 @@ jobs:
       - name: Run Zero-Auth Scavenger
         env:
           POOL_REPO:              Ox518/genFre
-          # Optional — worker count multiplies if any of these are present
           CF_API_TOKEN:           ${{ secrets.CF_API_TOKEN }}
           CF_ACCOUNT_ID:          ${{ secrets.CF_ACCOUNT_ID }}
           DENO_DEPLOY_TOKEN:      ${{ secrets.DENO_DEPLOY_TOKEN }}
@@ -66,9 +65,10 @@ jobs:
 
       - name: Summary
         run: |
-          python -c "
-import yaml; from pathlib import Path
-m = yaml.safe_load(Path('fleet/harvest/workers.yaml').read_text()).get('meta', {})
-print(f\"Workers : {m.get('active_count',0)}/{m.get('target_count',50)}\")
-print(f\"Hashrate: {m.get('total_hashrate_estimate','0 H/s')}\")
-"
+          python3 << 'EOF'
+          import yaml
+          from pathlib import Path
+          m = yaml.safe_load(Path('fleet/harvest/workers.yaml').read_text()).get('meta', {})
+          print('Workers : {}/{}'.format(m.get('active_count', 0), m.get('target_count', 50)))
+          print('Hashrate: {}'.format(m.get('total_hashrate_estimate', '0 H/s')))
+          EOF
