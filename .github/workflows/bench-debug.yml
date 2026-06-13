@@ -27,66 +27,96 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: "[DEBUG] Environment"
+      - name: Init log
         run: |
-          echo "=== Runner info ==="
-          uname -a
-          nproc
-          free -h
-          echo "=== Inputs ==="
-          echo "pool_url   : ${{ github.event.inputs.pool_url }}"
-          echo "stratum_user: ${{ github.event.inputs.stratum_user }}"
-          echo "duration   : ${{ github.event.inputs.duration }}s"
+          mkdir -p /tmp/diag
+          LOG=/tmp/diag/bench-debug.log
+          echo "BENCH-DEBUG LOG" > $LOG
+          echo "run_id   : ${{ github.run_id }}" >> $LOG
+          echo "run_url  : https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $LOG
+          echo "timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $LOG
+          echo "pool_url : ${{ github.event.inputs.pool_url }}" >> $LOG
+          echo "user     : ${{ github.event.inputs.stratum_user }}" >> $LOG
+          echo "duration : ${{ github.event.inputs.duration }}s" >> $LOG
+          echo "runner   : $(uname -a)" >> $LOG
+          echo "cpus     : $(nproc)" >> $LOG
+          echo "ram      : $(free -h | awk '/Mem/{print $2}')" >> $LOG
+          echo "" >> $LOG
 
-      - name: "[DEBUG] Raw TCP stratum handshake"
+      - name: "[1] TCP stratum handshake"
         run: |
+          LOG=/tmp/diag/bench-debug.log
           HOST=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f1)
           PORT=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f2)
-          echo "=== Testing raw TCP to $HOST:$PORT ==="
-          timeout 15 bash -c "(
-            echo '{"id":1,"method":"mining.subscribe","params":["cpuminer/2.5"]}'
+          echo "=== [1] RAW TCP STRATUM HANDSHAKE ==" >> $LOG
+          echo "host=$HOST port=$PORT" >> $LOG
+          RESULT=$(timeout 15 bash -c "(
+            printf '{\"id\":1,\"method\":\"mining.subscribe\",\"params\":[\"cpuminer/2.5\"]}\n'
             sleep 3
-            echo '{"id":2,"method":"mining.authorize","params":["${{ github.event.inputs.stratum_user }}","${{ github.event.inputs.stratum_pass }}"]}'  
+            printf '{\"id\":2,\"method\":\"mining.authorize\",\"params\":[\"${{ github.event.inputs.stratum_user }}\",\"${{ github.event.inputs.stratum_pass }}\"]}\'\n'
             sleep 5
-          ) | nc -v $HOST $PORT" 2>&1 || echo "[TCP TEST] exited (normal after handshake)"
+          ) | nc $HOST $PORT 2>&1" || true)
+          echo "$RESULT" >> $LOG
+          # Parse key fields
+          if echo "$RESULT" | grep -q '"result":true'; then
+            echo "TCP_AUTH=AUTHORIZED" >> $LOG
+          elif echo "$RESULT" | grep -q '"result":false'; then
+            echo "TCP_AUTH=REJECTED" >> $LOG
+          elif echo "$RESULT" | grep -q 'mining.notify'; then
+            echo "TCP_AUTH=GOT_JOB_NO_AUTH_RESPONSE" >> $LOG
+          elif [ -z "$RESULT" ]; then
+            echo "TCP_AUTH=NO_RESPONSE_CONNECTION_REFUSED" >> $LOG
+          else
+            echo "TCP_AUTH=UNKNOWN" >> $LOG
+          fi
+          echo "" >> $LOG
 
-      - name: "[DEBUG] Install build deps"
+      - name: Install build deps
         run: |
-          echo "=== Installing build dependencies ==="
+          LOG=/tmp/diag/bench-debug.log
+          echo "=== [2] BUILD DEPS ===" >> $LOG
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             build-essential automake autoconf pkg-config \
             libcurl4-openssl-dev libjansson-dev \
-            libssl-dev libgmp-dev
-          echo "=== Done ==="
+            libssl-dev libgmp-dev 2>&1 | tail -5 >> $LOG
+          echo "apt_exit=$?" >> $LOG
+          echo "" >> $LOG
 
-      - name: "[DEBUG] Build cpuminer-multi"
+      - name: Build cpuminer-multi
         run: |
-          echo "=== Cloning cpuminer-multi ==="
-          git clone --depth=1 https://github.com/tpruvot/cpuminer-multi.git /tmp/cpuminer-multi
+          LOG=/tmp/diag/bench-debug.log
+          echo "=== [3] BUILD CPUMINER ===" >> $LOG
+          git clone --depth=1 https://github.com/tpruvot/cpuminer-multi.git /tmp/cpuminer-multi 2>&1 | tail -3 >> $LOG
           cd /tmp/cpuminer-multi
-          echo "=== autogen ==="
-          ./autogen.sh
-          echo "=== configure ==="
-          ./configure CFLAGS="-O2" --disable-assembly
-          echo "=== make ==="
-          make -j$(nproc)
-          echo "=== Version ==="
-          /tmp/cpuminer-multi/minerd --version
-          echo "=== Supported algos ==="
-          /tmp/cpuminer-multi/minerd --algo=help 2>&1 | grep -i yescrypt || echo "[WARN] yescrypt not listed"
+          ./autogen.sh >> $LOG 2>&1
+          ./configure CFLAGS="-O2" --disable-assembly >> $LOG 2>&1
+          make -j$(nproc) >> $LOG 2>&1
+          BUILD_EXIT=$?
+          echo "build_exit=$BUILD_EXIT" >> $LOG
+          if [ $BUILD_EXIT -eq 0 ]; then
+            VERSION=$(/tmp/cpuminer-multi/minerd --version 2>&1 | head -1)
+            echo "version=$VERSION" >> $LOG
+            ALGOS=$(/tmp/cpuminer-multi/minerd --algo=help 2>&1)
+            if echo "$ALGOS" | grep -qi "yescryptr16"; then
+              echo "algo_yescryptr16=SUPPORTED" >> $LOG
+            else
+              echo "algo_yescryptr16=NOT_FOUND" >> $LOG
+              echo "available_yescrypt_algos=$(echo \"$ALGOS\" | grep -i yescrypt)" >> $LOG
+            fi
+          else
+            echo "BUILD FAILED" >> $LOG
+          fi
+          echo "" >> $LOG
 
-      - name: "[DEBUG] Mine with --debug flag"
+      - name: "[4] Mine with --debug"
         run: |
+          LOG=/tmp/diag/bench-debug.log
           HOST=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f1)
           PORT=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f2)
           DURATION=${{ github.event.inputs.duration }}
-          echo "=== Launching cpuminer --debug ==="
-          echo "  algo    : yescryptr16"
-          echo "  pool    : $HOST:$PORT"
-          echo "  user    : ${{ github.event.inputs.stratum_user }}"
-          echo "  duration: ${DURATION}s"
-          timeout ${DURATION} /tmp/cpuminer-multi/minerd \
+          echo "=== [4] CPUMINER --debug OUTPUT ===" >> $LOG
+          timeout $DURATION /tmp/cpuminer-multi/minerd \
             --algo yescryptr16 \
             --url stratum+tcp://$HOST:$PORT \
             --user ${{ github.event.inputs.stratum_user }} \
@@ -97,5 +127,63 @@ jobs:
             --retry-pause 10 \
             --reconnect \
             --debug \
-            2>&1 || echo "[cpuminer] exited with code $?"
-          echo "=== cpuminer finished ==="
+            2>&1 | tee -a $LOG || true
+          MINE_EXIT=$?
+          echo "" >> $LOG
+          echo "mine_exit=$MINE_EXIT" >> $LOG
+
+      - name: "[5] Parse results + write summary"
+        if: always()
+        run: |
+          LOG=/tmp/diag/bench-debug.log
+          echo "=== [5] PARSED SUMMARY ===" >> $LOG
+
+          # Key diagnostics
+          TCP_AUTH=$(grep 'TCP_AUTH=' $LOG | cut -d= -f2)
+          ALGO_OK=$(grep 'algo_yescryptr16=' $LOG | cut -d= -f2)
+          BUILD_OK=$(grep 'build_exit=' $LOG | cut -d= -f2)
+          MINE_EXIT=$(grep 'mine_exit=' $LOG | tail -1 | cut -d= -f2)
+          ACCEPTED=$(grep -c 'accepted' $LOG || echo 0)
+          HASHRATE=$(grep -oP '[\d.]+\s*(kH|MH|H)/s' $LOG | tail -1)
+          ERRORS=$(grep -c 'ERROR\|error\|disconnected\|rejected' $LOG || echo 0)
+          LAST_ERROR=$(grep -i 'error\|disconnected\|rejected\|failed' $LOG | tail -3)
+
+          echo "tcp_auth_result : $TCP_AUTH" >> $LOG
+          echo "algo_supported  : $ALGO_OK" >> $LOG
+          echo "build_success   : $BUILD_OK" >> $LOG
+          echo "mine_exit_code  : $MINE_EXIT" >> $LOG
+          echo "shares_accepted : $ACCEPTED" >> $LOG
+          echo "last_hashrate   : $HASHRATE" >> $LOG
+          echo "error_count     : $ERRORS" >> $LOG
+          echo "last_errors     :" >> $LOG
+          echo "$LAST_ERROR" >> $LOG
+
+          # Write GitHub step summary (readable in Actions UI)
+          cat >> $GITHUB_STEP_SUMMARY << SUMMARY
+          ## GitMine Bench Debug Results
+          | Check | Result |
+          |---|---|
+          | TCP Auth | $TCP_AUTH |
+          | Algorithm yescryptr16 | $ALGO_OK |
+          | Build Exit | $BUILD_OK |
+          | Mine Exit Code | $MINE_EXIT |
+          | Shares Accepted | $ACCEPTED |
+          | Last Hashrate | $HASHRATE |
+          | Error Count | $ERRORS |
+
+          ### Last Errors
+          \`\`\`
+          $LAST_ERROR
+          \`\`\`
+          SUMMARY
+
+          echo "summary written"
+          cat $LOG
+
+      - name: Upload diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-debug-${{ github.run_id }}
+          path: /tmp/diag/bench-debug.log
+          retention-days: 7
