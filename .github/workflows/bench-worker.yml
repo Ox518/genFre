@@ -109,6 +109,13 @@ jobs:
             exit 1
           }
           cd /tmp/cpuminer
+
+          # Fix: yescrypt-platform.c is #included directly by both yescrypt-avx2.c
+          # and yescrypt-sse.c causing duplicate symbol errors on GCC 12+.
+          # Wrap it with a classic include-guard so the second inclusion is a no-op.
+          sed -i '1s/^/#ifndef YESCRYPT_PLATFORM_C\n#define YESCRYPT_PLATFORM_C\n/' yescrypt-platform.c
+          echo '#endif /* YESCRYPT_PLATFORM_C */' >> yescrypt-platform.c
+
           ./autogen.sh 2>&1 || { echo "[error] BUILD_AUTOGEN_FAIL"; exit 1; }
           ./configure \
             CFLAGS="-O3 -march=native -mavx2 -maes -msse4.2 \
