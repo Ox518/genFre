@@ -150,7 +150,7 @@ jobs:
           DURATION  = min(int(os.environ.get("DURATION_MIN", "30")), 55) * 60
           RIG       = os.environ.get("RIG_ID", "bench-rig-01")
           BINARY    = "/tmp/cpuminer/cpuminer"
-          STATSFILE = "/tmp/cpuminer-stats.json"
+          DATAFILE  = "/tmp/cpuminer-data.json"
 
           try:
               NTHREADS = int(os.environ.get("OPTIMAL_THREADS", str(multiprocessing.cpu_count())))
@@ -195,8 +195,8 @@ jobs:
           state = {"hashrate": 0.0, "shares": 0, "errors": 0,
                    "accepted": 0, "rejected": 0, "last_error": ""}
 
-          re_opt_acc = re.compile(r'(\d+)\s+Accepted\s+(\d+)\s+S\d+\s+R(\d+)', re.I)
-          re_ttf     = re.compile(r'TTF\s*@\s*([\d.]+)\s*(h/s|kh/s|mh/s|gh/s)', re.I)
+          # cpuminer-opt stdout patterns
+          re_accept  = re.compile(r'accepted\s+(\d+)/(\d+)', re.I)
           re_speed   = re.compile(r'([\d.]+)\s*(kH|MH|GH|H)/s', re.I)
           re_error   = re.compile(r'error|disconnected|failed|connection refused|timed out', re.I)
 
@@ -207,63 +207,38 @@ jobs:
               if 'g' in u: return val * 1e9
               return val
 
-          def read_statsfile():
-              try:
-                  with open(STATSFILE) as f:
-                      raw = f.read().strip()
-                  last = None
-                  for line in raw.splitlines():
-                      line = line.strip()
-                      if line.startswith('{'):
-                          try: last = json.loads(line)
-                          except: pass
-                  if not last:
-                      last = json.loads(raw)
-                  khs  = float(last.get("KHS", last.get("HS", 0)))
-                  unit = "KHS" if "KHS" in last else "HS"
-                  state["hashrate"]  = khs * 1e3 if unit == "KHS" else khs
-                  state["accepted"]  = int(last.get("accepted", state["accepted"]))
-                  state["rejected"]  = int(last.get("rejected", state["rejected"]))
-                  state["shares"]    = state["accepted"]
-                  state["errors"]    = state["rejected"] + int(last.get("hw_errors", 0))
-                  return True
-              except Exception:
-                  return False
-
           def parse_stdout(line):
               line = line.strip()
               if not line: return
               print(f"[miner] {line}", flush=True)
-              m = re_opt_acc.search(line)
+              # "accepted 3/4" style
+              m = re_accept.search(line)
               if m:
-                  state["accepted"] = int(m.group(2))
-                  state["rejected"] = int(m.group(3))
+                  state["accepted"] = int(m.group(1))
+                  total = int(m.group(2))
+                  state["rejected"] = total - state["accepted"]
                   state["shares"]   = state["accepted"]
                   state["errors"]   = state["rejected"]
                   return
-              m2 = re_ttf.search(line)
-              if m2:
-                  state["hashrate"] = to_hs(float(m2.group(1)), m2.group(2))
-                  return
-              m3 = re_speed.search(line)
-              if m3 and 'net hash' not in line.lower():
-                  state["hashrate"] = to_hs(float(m3.group(1)), m3.group(2))
+              ms = re_speed.search(line)
+              if ms and 'net hash' not in line.lower():
+                  state["hashrate"] = to_hs(float(ms.group(1)), ms.group(2))
               if re_error.search(line):
                   state["last_error"] = line[:120]
 
           cmd = [
               BINARY,
-              "--algo",         ALGO,
-              "--url",          f"stratum+tcp://{host}:{port}",
-              "--user",         SUSER,
-              "--pass",         SPASS,
-              "--threads",      str(NTHREADS),
-              "--cpu-priority", "2",
+              "--algo",        ALGO,
+              "--url",         f"stratum+tcp://{host}:{port}",
+              "--user",        SUSER,
+              "--pass",        SPASS,
+              "--threads",     str(NTHREADS),
               "--no-longpoll",
-              "--statsfile",    STATSFILE,
-              "--timeout",      "300",
-              "--retries",      "-1",
-              "--retry-pause",  "10",
+              "--data-file",   DATAFILE,
+              "--timeout",     "300",
+              "--retries",     "-1",
+              "--retry-pause", "10",
+              "--time-limit",  str(DURATION),
           ]
           print(f"[worker] threads={NTHREADS} cmd: {' '.join(cmd)}", flush=True)
 
@@ -304,20 +279,14 @@ jobs:
               now     = time.time()
               elapsed = now - start
 
-              if elapsed >= DURATION:
-                  print(f"[worker] duration reached ({DURATION}s), stopping", flush=True)
-                  proc.terminate()
-                  break
-
               rc = proc.poll()
               if rc is not None:
+                  # --time-limit causes a clean exit (0)
                   if rc not in (0, -15):
                       msg = f"MINER_CRASH: exit code {rc}"
                       print(f"[error] {msg}", flush=True)
                       patch({"status": "error", "last_error": msg})
                   break
-
-              read_statsfile()
 
               if elapsed > 30:
                   if state["hashrate"] == 0:
@@ -358,7 +327,6 @@ jobs:
           proc.wait()
           t.join(timeout=5)
           uptime = int(time.time() - start)
-          read_statsfile()
 
           patch({
               "status":   "stopped", "hashrate": "0",
