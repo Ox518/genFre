@@ -10,6 +10,10 @@ on:
         description: 'stratum+tcp://host:port'
         required: true
         default: 'stratum+tcp://americas.mining-dutch.nl:9983'
+      rig_id:
+        description: 'Rig name for display'
+        required: false
+        default: 'bench-rig-01'
       stratum_user:
         description: 'Stratum username  e.g. 5mil.worker7'
         required: false
@@ -18,7 +22,7 @@ on:
         description: 'Stratum password'
         required: false
         default: 'x'
-      duration:
+      duration_minutes:
         description: 'Mining duration in minutes (max 55)'
         required: false
         default: '30'
@@ -38,11 +42,11 @@ jobs:
       SUPA_KEY:     ${{ secrets.BENCHANONKEY }}
       WORKER_ID:    ${{ github.event.inputs.worker_id }}
       POOL_URL:     ${{ github.event.inputs.pool_url }}
+      RIG_ID:       ${{ github.event.inputs.rig_id }}
       SUSER:        ${{ github.event.inputs.stratum_user }}
       SPASS:        ${{ github.event.inputs.stratum_pass }}
-      DURATION_MIN: ${{ github.event.inputs.duration }}
+      DURATION_MIN: ${{ github.event.inputs.duration_minutes }}
       ALGO:         ${{ github.event.inputs.algo }}
-      RIG_ID:       bench-rig-01
 
     steps:
       - name: Validate inputs
@@ -144,7 +148,7 @@ jobs:
           SUPA_KEY  = os.environ.get("SUPA_KEY", "")
           WID       = os.environ.get("WORKER_ID", "")
           POOL_URL  = os.environ.get("POOL_URL", "")
-          SUSER     = os.environ.get("SUSER",  "bench")
+          SUSER     = os.environ.get("SUSER",  "5mil.worker7")
           SPASS     = os.environ.get("SPASS",  "x")
           ALGO      = os.environ.get("ALGO",   "yescryptr16")
           DURATION  = min(int(os.environ.get("DURATION_MIN", "30")), 55) * 60
@@ -211,7 +215,6 @@ jobs:
               line = line.strip()
               if not line: return
               print(f"[miner] {line}", flush=True)
-              # "accepted 3/4" style
               m = re_accept.search(line)
               if m:
                   state["accepted"] = int(m.group(1))
@@ -281,7 +284,6 @@ jobs:
 
               rc = proc.poll()
               if rc is not None:
-                  # --time-limit causes a clean exit (0)
                   if rc not in (0, -15):
                       msg = f"MINER_CRASH: exit code {rc}"
                       print(f"[error] {msg}", flush=True)
