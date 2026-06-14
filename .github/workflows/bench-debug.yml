@@ -24,7 +24,7 @@ jobs:
   debug:
     name: debug
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Init log
@@ -41,6 +41,7 @@ jobs:
           echo "runner   : $(uname -a)" >> $LOG
           echo "cpus     : $(nproc)" >> $LOG
           echo "ram      : $(free -h | awk '/Mem/{print $2}')" >> $LOG
+          echo "cpu_flags: $(grep -m1 flags /proc/cpuinfo | grep -oE 'avx[^ ]*|sse[^ ]*' | tr '\n' ' ')" >> $LOG
           echo "" >> $LOG
 
       - name: "[1] TCP stratum handshake"
@@ -48,16 +49,15 @@ jobs:
           LOG=/tmp/diag/bench-debug.log
           HOST=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f1)
           PORT=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f2)
-          echo "=== [1] RAW TCP STRATUM HANDSHAKE ==" >> $LOG
+          echo "=== [1] RAW TCP STRATUM HANDSHAKE ===" >> $LOG
           echo "host=$HOST port=$PORT" >> $LOG
           RESULT=$(timeout 15 bash -c "(
-            printf '{\"id\":1,\"method\":\"mining.subscribe\",\"params\":[\"cpuminer/2.5\"]}\n'
+            printf '{"id":1,"method":"mining.subscribe","params":["cpuminer/2.5"]}\n'
             sleep 3
-            printf '{\"id\":2,\"method\":\"mining.authorize\",\"params\":[\"${{ github.event.inputs.stratum_user }}\",\"${{ github.event.inputs.stratum_pass }}\"]}\'\n'
+            printf '{"id":2,"method":"mining.authorize","params":["${{ github.event.inputs.stratum_user }}","${{ github.event.inputs.stratum_pass }}"]}\n'
             sleep 5
           ) | nc $HOST $PORT 2>&1" || true)
           echo "$RESULT" >> $LOG
-          # Parse key fields
           if echo "$RESULT" | grep -q '"result":true'; then
             echo "TCP_AUTH=AUTHORIZED" >> $LOG
           elif echo "$RESULT" | grep -q '"result":false'; then
@@ -73,111 +73,96 @@ jobs:
 
       - name: Install build deps
         run: |
-          LOG=/tmp/diag/bench-debug.log
-          echo "=== [2] BUILD DEPS ===" >> $LOG
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             build-essential automake autoconf pkg-config \
             libcurl4-openssl-dev libjansson-dev \
-            libssl-dev libgmp-dev 2>&1 | tail -5 >> $LOG
-          echo "apt_exit=$?" >> $LOG
-          echo "" >> $LOG
+            libssl-dev libgmp-dev
 
-      - name: Build cpuminer-multi
+      - name: "[2] Build cpuminer-yescryptr16 (AVX2)"
         run: |
           LOG=/tmp/diag/bench-debug.log
-          echo "=== [3] BUILD CPUMINER ===" >> $LOG
-          git clone --depth=1 https://github.com/tpruvot/cpuminer-multi.git /tmp/cpuminer-multi 2>&1 | tail -3 >> $LOG
-          cd /tmp/cpuminer-multi
+          echo "=== [2] BUILD CPUMINER (yescryptr16 + AVX2) ===" >> $LOG
+          git clone --depth=1 https://github.com/5mil/cpuminer-yescryptr16.git /tmp/cpuminer 2>&1 | tail -3 >> $LOG
+          cd /tmp/cpuminer
           ./autogen.sh >> $LOG 2>&1
-          ./configure CFLAGS="-O2" --disable-assembly >> $LOG 2>&1
+          ./configure \
+            CFLAGS="-O3 -march=native -mavx2 -maes -msse4.2 -funroll-loops -fomit-frame-pointer -falign-functions=16 -fno-strict-aliasing" \
+            --enable-assembly >> $LOG 2>&1
           make -j$(nproc) >> $LOG 2>&1
           BUILD_EXIT=$?
           echo "build_exit=$BUILD_EXIT" >> $LOG
+          strip -s /tmp/cpuminer/minerd 2>/dev/null || true
           if [ $BUILD_EXIT -eq 0 ]; then
-            VERSION=$(/tmp/cpuminer-multi/minerd --version 2>&1 | head -1)
+            VERSION=$(/tmp/cpuminer/minerd --version 2>&1 | head -1)
             echo "version=$VERSION" >> $LOG
-            ALGOS=$(/tmp/cpuminer-multi/minerd --algo=help 2>&1)
-            if echo "$ALGOS" | grep -qi "yescryptr16"; then
-              echo "algo_yescryptr16=SUPPORTED" >> $LOG
-            else
-              echo "algo_yescryptr16=NOT_FOUND" >> $LOG
-              echo "available_yescrypt_algos=$(echo \"$ALGOS\" | grep -i yescrypt)" >> $LOG
-            fi
+            echo "cpu_simd=$(grep -m1 flags /proc/cpuinfo | grep -oE 'avx[^ ]*' | head -3 | tr '\n' ' ')" >> $LOG
           else
-            echo "BUILD FAILED" >> $LOG
+            echo "BUILD FAILED — check log above" >> $LOG
           fi
           echo "" >> $LOG
 
-      - name: "[4] Mine with --debug"
+      - name: "[3] Mine with --debug"
         run: |
           LOG=/tmp/diag/bench-debug.log
           HOST=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f1)
           PORT=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f2)
           DURATION=${{ github.event.inputs.duration }}
-          echo "=== [4] CPUMINER --debug OUTPUT ===" >> $LOG
-          timeout $DURATION /tmp/cpuminer-multi/minerd \
+          echo "=== [3] CPUMINER --debug OUTPUT ===" >> $LOG
+          timeout $DURATION /tmp/cpuminer/minerd \
             --algo yescryptr16 \
             --url stratum+tcp://$HOST:$PORT \
             --user ${{ github.event.inputs.stratum_user }} \
             --pass ${{ github.event.inputs.stratum_pass }} \
-            --threads 2 \
+            --threads $(nproc) \
             --timeout 300 \
             --retries -1 \
             --retry-pause 10 \
             --reconnect \
             --debug \
             2>&1 | tee -a $LOG || true
-          MINE_EXIT=$?
+          echo "mine_exit=$?" >> $LOG
           echo "" >> $LOG
-          echo "mine_exit=$MINE_EXIT" >> $LOG
 
-      - name: "[5] Parse results + write summary"
+      - name: "[4] Parse results + write summary"
         if: always()
         run: |
           LOG=/tmp/diag/bench-debug.log
-          echo "=== [5] PARSED SUMMARY ===" >> $LOG
-
-          # Key diagnostics
+          echo "=== [4] PARSED SUMMARY ===" >> $LOG
           TCP_AUTH=$(grep 'TCP_AUTH=' $LOG | cut -d= -f2)
-          ALGO_OK=$(grep 'algo_yescryptr16=' $LOG | cut -d= -f2)
           BUILD_OK=$(grep 'build_exit=' $LOG | cut -d= -f2)
           MINE_EXIT=$(grep 'mine_exit=' $LOG | tail -1 | cut -d= -f2)
-          ACCEPTED=$(grep -c 'accepted' $LOG || echo 0)
-          HASHRATE=$(grep -oP '[\d.]+\s*(kH|MH|H)/s' $LOG | tail -1)
-          ERRORS=$(grep -c 'ERROR\|error\|disconnected\|rejected' $LOG || echo 0)
+          HASHRATE=$(grep -oP '[\d.]+\s*(kH|MH|GH|H)/s' $LOG | tail -1)
+          ACCEPTED=$(grep -ci 'accepted' $LOG || echo 0)
+          ERRORS=$(grep -ci 'error\|disconnected\|rejected\|failed' $LOG || echo 0)
           LAST_ERROR=$(grep -i 'error\|disconnected\|rejected\|failed' $LOG | tail -3)
+          CPU_SIMD=$(grep 'cpu_simd=' $LOG | cut -d= -f2)
 
-          echo "tcp_auth_result : $TCP_AUTH" >> $LOG
-          echo "algo_supported  : $ALGO_OK" >> $LOG
-          echo "build_success   : $BUILD_OK" >> $LOG
-          echo "mine_exit_code  : $MINE_EXIT" >> $LOG
-          echo "shares_accepted : $ACCEPTED" >> $LOG
-          echo "last_hashrate   : $HASHRATE" >> $LOG
-          echo "error_count     : $ERRORS" >> $LOG
-          echo "last_errors     :" >> $LOG
-          echo "$LAST_ERROR" >> $LOG
+          echo "tcp_auth     : $TCP_AUTH"  >> $LOG
+          echo "build_exit   : $BUILD_OK"  >> $LOG
+          echo "mine_exit    : $MINE_EXIT" >> $LOG
+          echo "hashrate     : $HASHRATE"  >> $LOG
+          echo "shares       : $ACCEPTED"  >> $LOG
+          echo "errors       : $ERRORS"    >> $LOG
+          echo "simd_active  : $CPU_SIMD"  >> $LOG
 
-          # Write GitHub step summary (readable in Actions UI)
           cat >> $GITHUB_STEP_SUMMARY << SUMMARY
-          ## GitMine Bench Debug Results
-          | Check | Result |
-          |---|---|
-          | TCP Auth | $TCP_AUTH |
-          | Algorithm yescryptr16 | $ALGO_OK |
-          | Build Exit | $BUILD_OK |
-          | Mine Exit Code | $MINE_EXIT |
-          | Shares Accepted | $ACCEPTED |
-          | Last Hashrate | $HASHRATE |
-          | Error Count | $ERRORS |
+## GitMine Bench Debug Results
+| Check | Result |
+|---|---|
+| TCP Auth | $TCP_AUTH |
+| Build Exit | $BUILD_OK |
+| Mine Exit | $MINE_EXIT |
+| Hashrate | $HASHRATE |
+| Shares Accepted | $ACCEPTED |
+| Error Count | $ERRORS |
+| SIMD Active | $CPU_SIMD |
 
-          ### Last Errors
-          \`\`\`
-          $LAST_ERROR
-          \`\`\`
-          SUMMARY
-
-          echo "summary written"
+### Last Errors
+\`\`\`
+$LAST_ERROR
+\`\`\`
+SUMMARY
           cat $LOG
 
       - name: Upload diagnostic log
