@@ -110,7 +110,6 @@ jobs:
           }
           cd /tmp/cpuminer
           ./build.sh 2>&1 || {
-            # build.sh may not exist on all versions, fall back to manual
             echo "[build] build.sh failed or missing, trying manual configure"
             ./autogen.sh 2>&1 || { echo "[error] BUILD_AUTOGEN_FAIL"; exit 1; }
             ./configure CFLAGS="-O3 -march=native -funroll-loops -fomit-frame-pointer -fno-strict-aliasing" 2>&1 || { echo "[error] BUILD_CONFIGURE_FAIL"; exit 1; }
@@ -182,40 +181,52 @@ jobs:
           state = {"hashrate": 0.0, "shares": 0, "errors": 0,
                    "accepted": 0, "rejected": 0, "last_error": ""}
 
-          re_accepted = re.compile(r"accepted:\s*(\d+)/(\d+).*?([\d.]+)\s*(kH|MH|GH|H)/s", re.I)
-          re_yay      = re.compile(r"yay!!!", re.I)
-          re_boo      = re.compile(r"booooo", re.I)
-          re_speed    = re.compile(r"([\d.]+)\s*(kH|MH|GH|H)/s", re.I)
-          re_error    = re.compile(r"error|disconnected|rejected|failed|connection refused|timed out", re.I)
+          # cpuminer-opt formats:
+          # "5 Accepted 5 S0 R0 B0, 41.452 sec (75ms)"  — cumulative accepted line
+          # "TTF @ 539.56 h/s: Block 14h05m, Share 30s" — speed line
+          # "Net hash rate (est) 141.69 kh/s"           — network hashrate (ignore)
+          re_opt_acc  = re.compile(r'(\d+)\s+Accepted\s+(\d+)\s+S\d+\s+R(\d+)', re.I)
+          re_ttf      = re.compile(r'TTF\s*@\s*([\d.]+)\s*(h/s|kh/s|mh/s|gh/s)', re.I)
+          re_speed    = re.compile(r'([\d.]+)\s*(kH|MH|GH|H)/s', re.I)
+          re_error    = re.compile(r'error|disconnected|rejected|failed|connection refused|timed out', re.I)
 
           def to_hs(val, unit):
-              u = unit.lower()
-              if u == "kh": return val * 1e3
-              if u == "mh": return val * 1e6
-              if u == "gh": return val * 1e9
+              u = unit.lower().replace('/s','').replace('h','')
+              # unit is already stripped to k/m/g or empty
+              if 'k' in unit.lower(): return val * 1e3
+              if 'm' in unit.lower(): return val * 1e6
+              if 'g' in unit.lower(): return val * 1e9
               return val
 
           def parse_line(line):
               line = line.strip()
               if not line: return
               print(f"[miner] {line}", flush=True)
-              m = re_accepted.search(line)
+
+              # cpuminer-opt accepted line: "5 Accepted 5 S0 R0 B0, ..."
+              m = re_opt_acc.search(line)
               if m:
-                  state["accepted"] = int(m.group(1))
-                  state["rejected"] = int(m.group(2)) - state["accepted"]
-                  state["errors"]   = state["rejected"]
-                  state["shares"]   = state["accepted"]
-                  state["hashrate"] = to_hs(float(m.group(3)), m.group(4))
+                  state["accepted"]  = int(m.group(2))
+                  state["rejected"]  = int(m.group(3))
+                  state["shares"]    = state["accepted"]
+                  state["errors"]    = state["rejected"]
                   return
-              if re_yay.search(line): state["shares"] += 1; return
-              if re_boo.search(line):
-                  state["errors"] += 1
-                  state["last_error"] = line[:120]
+
+              # TTF speed line: "TTF @ 539.56 h/s: ..."
+              m2 = re_ttf.search(line)
+              if m2:
+                  state["hashrate"] = to_hs(float(m2.group(1)), m2.group(2))
                   return
+
+              # fallback speed
+              m3 = re_speed.search(line)
+              if m3:
+                  # skip network hash rate lines
+                  if 'net hash' not in line.lower():
+                      state["hashrate"] = to_hs(float(m3.group(1)), m3.group(2))
+
               if re_error.search(line):
                   state["last_error"] = line[:120]
-              m2 = re_speed.search(line)
-              if m2: state["hashrate"] = to_hs(float(m2.group(1)), m2.group(2))
 
           cmd = [
               BINARY,
@@ -302,6 +313,8 @@ jobs:
                       "errors":   state["errors"],
                       "uptime_s": int(elapsed),
                       "last_error": state["last_error"],
+                      "accepted": state["accepted"],
+                      "rejected": state["rejected"],
                       "stratum_job": {
                           "host": host, "port": int(port),
                           "algo": ALGO,
@@ -309,7 +322,7 @@ jobs:
                           "rejected": state["rejected"],
                       }
                   })
-                  print(f"[report] uptime={int(elapsed)}s hr={hr_int} shares={state['shares']} errors={state['errors']} last_error={state['last_error'][:60] or 'none'}", flush=True)
+                  print(f"[report] uptime={int(elapsed)}s hr={hr_int} shares={state['shares']} accepted={state['accepted']} rejected={state['rejected']} last_error={state['last_error'][:60] or 'none'}", flush=True)
                   last_report = now
 
               time.sleep(1)
@@ -322,6 +335,7 @@ jobs:
               "status": "stopped", "hashrate": "0",
               "shares": state["shares"], "errors": state["errors"],
               "uptime_s": uptime, "last_error": state["last_error"],
+              "accepted": state["accepted"], "rejected": state["rejected"],
           })
 
           final = {
@@ -341,7 +355,7 @@ jobs:
           }
           with open("/tmp/final.json", "w") as f:
               json.dump(final, f)
-          print(f"[worker] done — shares={state['shares']} errors={state['errors']} uptime={uptime}s exit={proc.returncode}", flush=True)
+          print(f"[worker] done — shares={state['shares']} accepted={state['accepted']} rejected={state['rejected']} uptime={uptime}s exit={proc.returncode}", flush=True)
           PYEOF
 
       - name: Upload telemetry
