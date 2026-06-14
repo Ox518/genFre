@@ -7,7 +7,7 @@ on:
         description: 'bench_workers row UUID (Supabase)'
         required: true
       pool_url:
-        description: 'stratum+tcp://host:port  (Fennec/Trinity external pool)'
+        description: 'stratum+tcp://host:port'
         required: true
         default: 'stratum+tcp://americas.mining-dutch.nl:9983'
       stratum_user:
@@ -19,7 +19,7 @@ on:
         required: false
         default: 'x'
       duration:
-        description: 'Mining duration in minutes  (max 55)'
+        description: 'Mining duration in minutes (max 55)'
         required: false
         default: '30'
       algo:
@@ -55,28 +55,33 @@ jobs:
           wid  = os.environ.get("WORKER_ID", "")
           errors = []
           if not re.match(r'^stratum\+tcp://[^:]+:\d+$', pool):
-              errors.append(f"BAD_POOL_URL: '{pool}' — must be stratum+tcp://host:port")
+              errors.append(f"BAD_POOL_URL: '{pool}'")
           if algo not in ("yescryptr16", "sha256d"):
-              errors.append(f"BAD_ALGO: '{algo}' — must be yescryptr16 or sha256d")
+              errors.append(f"BAD_ALGO: '{algo}'")
           try:
               d = int(dur)
               if d < 1 or d > 55:
-                  errors.append(f"BAD_DURATION: {d} — must be 1-55 minutes")
+                  errors.append(f"BAD_DURATION: {d} — must be 1-55")
           except ValueError:
-              errors.append(f"BAD_DURATION: '{dur}' is not an integer")
+              errors.append(f"BAD_DURATION: '{dur}' not an integer")
           if not wid:
-              errors.append("MISSING_WORKER_ID: worker_id is required")
+              errors.append("MISSING_WORKER_ID")
           if errors:
-              for e in errors:
-                  print(f"[error] {e}", flush=True)
+              for e in errors: print(f"[error] {e}", flush=True)
               sys.exit(1)
           print(f"[validate] pool={pool} algo={algo} dur={dur}min wid={wid}", flush=True)
           PYEOF
 
-      - name: Enable hugepages
+      - name: System prep — hugepages + CPU info
         run: |
-          sudo sysctl -w vm.nr_hugepages=128 || true
-          echo "Hugepages: $(grep HugePages_Total /proc/meminfo)"
+          sudo sysctl -w vm.nr_hugepages=256 || true
+          HUGE=$(grep HugePages_Free /proc/meminfo | awk '{print $2}')
+          echo "[hugepages] free=$HUGE"
+          [ "$HUGE" -lt 64 ] && echo "[warn] only $HUGE hugepages free — yescrypt scratchpad performance may be reduced" || echo "[hugepages] OK"
+          echo "--- CPU INFO ---"
+          lscpu | grep -E 'Model name|Socket|Core|Thread|MHz|Cache|Flags' || true
+          grep -m1 'flags' /proc/cpuinfo | tr ' ' '\n' | grep -E '^(avx|aes|sha|sse|bmi|popcnt|vaes)' | sort | tr '\n' ' '
+          echo ""
 
       - name: Install build deps
         run: |
@@ -94,7 +99,7 @@ jobs:
           PORT=$(echo "$POOL_URL" | sed 's|stratum+tcp://||' | cut -d: -f2)
           echo "[preflight] testing $HOST:$PORT ..."
           if ! timeout 10 bash -c "echo '' | nc -w 5 $HOST $PORT" 2>/dev/null; then
-            echo "[error] PREFLIGHT_TCP_FAIL: cannot reach $HOST:$PORT — aborting to save runner minutes"
+            echo "[error] PREFLIGHT_TCP_FAIL: cannot reach $HOST:$PORT"
             exit 1
           fi
           echo "[preflight] TCP reachable ✓"
@@ -102,27 +107,40 @@ jobs:
       - name: Build cpuminer-opt
         id: build
         run: |
-          ALGO="${ALGO:-yescryptr16}"
-          echo "[build] cloning cpuminer-opt (JayDDee) for algo=$ALGO"
+          echo "[build] detecting CPU features for optimal CFLAGS ..."
+          CFLAGS="-O3 -march=native -funroll-loops -fomit-frame-pointer -fno-strict-aliasing"
+          grep -q avx512f /proc/cpuinfo && CFLAGS="$CFLAGS -mavx512f -mavx512vl -mavx512bw -mavx512dq" && echo "[build] +AVX512"
+          grep -q avx2    /proc/cpuinfo && CFLAGS="$CFLAGS -mavx2"  && echo "[build] +AVX2"
+          grep -q aes     /proc/cpuinfo && CFLAGS="$CFLAGS -maes"   && echo "[build] +AES"
+          grep -q sha_ni  /proc/cpuinfo && CFLAGS="$CFLAGS -msha"   && echo "[build] +SHA"
+          grep -q sse4_2  /proc/cpuinfo && CFLAGS="$CFLAGS -msse4.2" && echo "[build] +SSE4.2"
+          grep -q vaes    /proc/cpuinfo && CFLAGS="$CFLAGS -mvaes"  && echo "[build] +VAES"
+          echo "[build] CFLAGS=$CFLAGS"
+
           git clone --depth=1 https://github.com/JayDDee/cpuminer-opt.git /tmp/cpuminer 2>&1 || {
-            echo "[error] BUILD_CLONE_FAIL: git clone failed"
-            exit 1
+            echo "[error] BUILD_CLONE_FAIL"; exit 1
           }
           cd /tmp/cpuminer
+
           ./build.sh 2>&1 || {
-            echo "[build] build.sh failed or missing, trying manual configure"
+            echo "[build] build.sh failed, trying manual configure"
             ./autogen.sh 2>&1 || { echo "[error] BUILD_AUTOGEN_FAIL"; exit 1; }
-            ./configure CFLAGS="-O3 -march=native -funroll-loops -fomit-frame-pointer -fno-strict-aliasing" 2>&1 || { echo "[error] BUILD_CONFIGURE_FAIL"; exit 1; }
+            ./configure CFLAGS="$CFLAGS" 2>&1 || { echo "[error] BUILD_CONFIGURE_FAIL"; exit 1; }
             make -j$(nproc) 2>&1 || { echo "[error] BUILD_MAKE_FAIL"; exit 1; }
           }
-          if [ ! -f ./cpuminer ]; then
-            echo "[error] BUILD_BINARY_MISSING: cpuminer not found after build"
-            exit 1
-          fi
+
+          [ ! -f ./cpuminer ] && { echo "[error] BUILD_BINARY_MISSING"; exit 1; }
           strip -s cpuminer
-          echo "[build] cpuminer-opt built: $(./cpuminer --version | head -1)"
-          echo "[build] supported algos check:"
-          ./cpuminer --algo yescryptr16 --help 2>&1 | head -5 || true
+          echo "[build] done: $(./cpuminer --version | head -1)"
+
+          # Compute optimal thread count: physical cores only (no HT)
+          LOGICAL=$(nproc)
+          HT=$(lscpu 2>/dev/null | grep 'Thread(s) per core' | awk '{print $4}' || echo 1)
+          HT=${HT:-1}
+          THREADS=$((LOGICAL / HT))
+          [ "$THREADS" -lt 1 ] && THREADS=1
+          echo "OPTIMAL_THREADS=$THREADS" >> $GITHUB_ENV
+          echo "[build] logical=$LOGICAL HT=$HT optimal_threads=$THREADS"
 
       - name: Mine
         run: |
@@ -140,8 +158,14 @@ jobs:
           ALGO      = os.environ.get("ALGO",   "yescryptr16")
           DURATION  = min(int(os.environ.get("DURATION_MIN", "30")), 55) * 60
           RIG       = os.environ.get("RIG_ID", "bench-rig-01")
-          NPROC     = multiprocessing.cpu_count()
           BINARY    = "/tmp/cpuminer/cpuminer"
+          STATSFILE = "/tmp/cpuminer-stats.json"
+
+          # Use HT-aware thread count computed in build step
+          try:
+              NTHREADS = int(os.environ.get("OPTIMAL_THREADS", str(multiprocessing.cpu_count())))
+          except:
+              NTHREADS = multiprocessing.cpu_count()
 
           def patch(data, retries=3):
               if not SUPA_URL or not SUPA_KEY or not WID:
@@ -181,65 +205,82 @@ jobs:
           state = {"hashrate": 0.0, "shares": 0, "errors": 0,
                    "accepted": 0, "rejected": 0, "last_error": ""}
 
-          # cpuminer-opt formats:
-          # "5 Accepted 5 S0 R0 B0, 41.452 sec (75ms)"  — cumulative accepted line
-          # "TTF @ 539.56 h/s: Block 14h05m, Share 30s" — speed line
-          # "Net hash rate (est) 141.69 kh/s"           — network hashrate (ignore)
-          re_opt_acc  = re.compile(r'(\d+)\s+Accepted\s+(\d+)\s+S\d+\s+R(\d+)', re.I)
-          re_ttf      = re.compile(r'TTF\s*@\s*([\d.]+)\s*(h/s|kh/s|mh/s|gh/s)', re.I)
-          re_speed    = re.compile(r'([\d.]+)\s*(kH|MH|GH|H)/s', re.I)
-          re_error    = re.compile(r'error|disconnected|rejected|failed|connection refused|timed out', re.I)
+          # Stdout regexes as fallback if statsfile not yet written
+          re_opt_acc = re.compile(r'(\d+)\s+Accepted\s+(\d+)\s+S\d+\s+R(\d+)', re.I)
+          re_ttf     = re.compile(r'TTF\s*@\s*([\d.]+)\s*(h/s|kh/s|mh/s|gh/s)', re.I)
+          re_speed   = re.compile(r'([\d.]+)\s*(kH|MH|GH|H)/s', re.I)
+          re_error   = re.compile(r'error|disconnected|failed|connection refused|timed out', re.I)
 
           def to_hs(val, unit):
-              u = unit.lower().replace('/s','').replace('h','')
-              # unit is already stripped to k/m/g or empty
-              if 'k' in unit.lower(): return val * 1e3
-              if 'm' in unit.lower(): return val * 1e6
-              if 'g' in unit.lower(): return val * 1e9
+              u = unit.lower()
+              if 'k' in u: return val * 1e3
+              if 'm' in u: return val * 1e6
+              if 'g' in u: return val * 1e9
               return val
 
-          def parse_line(line):
+          def read_statsfile():
+              """Read cpuminer-opt --statsfile JSON. Returns True if updated state."""
+              try:
+                  with open(STATSFILE) as f:
+                      raw = f.read().strip()
+                  # statsfile may have multiple JSON objects; take last complete one
+                  last = None
+                  for line in raw.splitlines():
+                      line = line.strip()
+                      if line.startswith('{'):
+                          try: last = json.loads(line)
+                          except: pass
+                  if not last:
+                      last = json.loads(raw)
+                  # cpuminer-opt statsfile keys: KHS, accepted, rejected, hw_errors
+                  khs = float(last.get("KHS", last.get("HS", 0)))
+                  # KHS field is already in kH/s
+                  unit = "KHS" if "KHS" in last else "HS"
+                  state["hashrate"]  = khs * 1e3 if unit == "KHS" else khs
+                  state["accepted"]  = int(last.get("accepted", state["accepted"]))
+                  state["rejected"]  = int(last.get("rejected", state["rejected"]))
+                  state["shares"]    = state["accepted"]
+                  state["errors"]    = state["rejected"] + int(last.get("hw_errors", 0))
+                  return True
+              except Exception:
+                  return False
+
+          def parse_stdout(line):
               line = line.strip()
               if not line: return
               print(f"[miner] {line}", flush=True)
-
-              # cpuminer-opt accepted line: "5 Accepted 5 S0 R0 B0, ..."
               m = re_opt_acc.search(line)
               if m:
-                  state["accepted"]  = int(m.group(2))
-                  state["rejected"]  = int(m.group(3))
-                  state["shares"]    = state["accepted"]
-                  state["errors"]    = state["rejected"]
+                  state["accepted"] = int(m.group(2))
+                  state["rejected"] = int(m.group(3))
+                  state["shares"]   = state["accepted"]
+                  state["errors"]   = state["rejected"]
                   return
-
-              # TTF speed line: "TTF @ 539.56 h/s: ..."
               m2 = re_ttf.search(line)
               if m2:
                   state["hashrate"] = to_hs(float(m2.group(1)), m2.group(2))
                   return
-
-              # fallback speed
               m3 = re_speed.search(line)
-              if m3:
-                  # skip network hash rate lines
-                  if 'net hash' not in line.lower():
-                      state["hashrate"] = to_hs(float(m3.group(1)), m3.group(2))
-
+              if m3 and 'net hash' not in line.lower():
+                  state["hashrate"] = to_hs(float(m3.group(1)), m3.group(2))
               if re_error.search(line):
                   state["last_error"] = line[:120]
 
           cmd = [
               BINARY,
-              "--algo",        ALGO,
-              "--url",         f"stratum+tcp://{host}:{port}",
-              "--user",        SUSER,
-              "--pass",        SPASS,
-              "--threads",     str(NPROC),
-              "--timeout",     "300",
-              "--retries",     "-1",
-              "--retry-pause", "10",
+              "--algo",         ALGO,
+              "--url",          f"stratum+tcp://{host}:{port}",
+              "--user",         SUSER,
+              "--pass",         SPASS,
+              "--threads",      str(NTHREADS),
+              "--cpu-priority", "2",
+              "--no-longpoll",
+              "--statsfile",    STATSFILE,
+              "--timeout",      "300",
+              "--retries",      "-1",
+              "--retry-pause",  "10",
           ]
-          print(f"[worker] launching {NPROC} threads: {' '.join(cmd)}", flush=True)
+          print(f"[worker] threads={NTHREADS} cmd: {' '.join(cmd)}", flush=True)
 
           try:
               proc = subprocess.Popen(
@@ -262,9 +303,9 @@ jobs:
           def tail():
               try:
                   for line in proc.stdout:
-                      parse_line(line)
+                      parse_stdout(line)
               except Exception as e:
-                  print(f"[warn] tail thread error: {e}", flush=True)
+                  print(f"[warn] tail error: {e}", flush=True)
 
           t = threading.Thread(target=tail, daemon=True)
           t.start()
@@ -286,10 +327,13 @@ jobs:
               rc = proc.poll()
               if rc is not None:
                   if rc not in (0, -15):
-                      msg = f"MINER_CRASH: cpuminer exited with code {rc}"
+                      msg = f"MINER_CRASH: exit code {rc}"
                       print(f"[error] {msg}", flush=True)
                       patch({"status": "error", "last_error": msg})
                   break
+
+              # Prefer statsfile over stdout regex
+              read_statsfile()
 
               if elapsed > 30:
                   if state["hashrate"] == 0:
@@ -307,22 +351,22 @@ jobs:
               if now - last_report >= 15:
                   hr_int = int(state["hashrate"])
                   patch({
-                      "status": "mining",
-                      "hashrate": str(hr_int),
-                      "shares":   state["shares"],
-                      "errors":   state["errors"],
-                      "uptime_s": int(elapsed),
+                      "status":     "mining",
+                      "hashrate":   str(hr_int),
+                      "shares":     state["shares"],
+                      "errors":     state["errors"],
+                      "accepted":   state["accepted"],
+                      "rejected":   state["rejected"],
+                      "uptime_s":   int(elapsed),
                       "last_error": state["last_error"],
-                      "accepted": state["accepted"],
-                      "rejected": state["rejected"],
                       "stratum_job": {
-                          "host": host, "port": int(port),
-                          "algo": ALGO,
+                          "host": host, "port": int(port), "algo": ALGO,
                           "accepted": state["accepted"],
                           "rejected": state["rejected"],
+                          "threads":  NTHREADS,
                       }
                   })
-                  print(f"[report] uptime={int(elapsed)}s hr={hr_int} shares={state['shares']} accepted={state['accepted']} rejected={state['rejected']} last_error={state['last_error'][:60] or 'none'}", flush=True)
+                  print(f"[report] uptime={int(elapsed)}s hr={hr_int} accepted={state['accepted']} rejected={state['rejected']} err={state['last_error'][:50] or 'none'}", flush=True)
                   last_report = now
 
               time.sleep(1)
@@ -330,32 +374,33 @@ jobs:
           proc.wait()
           t.join(timeout=5)
           uptime = int(time.time() - start)
+          read_statsfile()  # final read
 
           patch({
-              "status": "stopped", "hashrate": "0",
-              "shares": state["shares"], "errors": state["errors"],
+              "status":   "stopped", "hashrate": "0",
+              "shares":   state["shares"],   "errors":   state["errors"],
+              "accepted": state["accepted"],  "rejected": state["rejected"],
               "uptime_s": uptime, "last_error": state["last_error"],
-              "accepted": state["accepted"], "rejected": state["rejected"],
           })
 
           final = {
-              "hashrate":   int(state["hashrate"]),
-              "shares":     state["shares"],
-              "errors":     state["errors"],
-              "uptime_s":   uptime,
-              "exit_code":  proc.returncode or 0,
-              "pool":       POOL_URL,
-              "algo":       ALGO,
-              "rig_id":     RIG,
-              "worker_id":  WID,
-              "threads":    NPROC,
-              "last_error": state["last_error"],
-              "accepted":   state["accepted"],
-              "rejected":   state["rejected"],
+              "hashrate":  int(state["hashrate"]),
+              "shares":    state["shares"],
+              "errors":    state["errors"],
+              "accepted":  state["accepted"],
+              "rejected":  state["rejected"],
+              "uptime_s":  uptime,
+              "exit_code": proc.returncode or 0,
+              "pool":      POOL_URL,
+              "algo":      ALGO,
+              "rig_id":    RIG,
+              "worker_id": WID,
+              "threads":   NTHREADS,
+              "last_error":state["last_error"],
           }
           with open("/tmp/final.json", "w") as f:
               json.dump(final, f)
-          print(f"[worker] done — shares={state['shares']} accepted={state['accepted']} rejected={state['rejected']} uptime={uptime}s exit={proc.returncode}", flush=True)
+          print(f"[worker] done — accepted={state['accepted']} rejected={state['rejected']} uptime={uptime}s", flush=True)
           PYEOF
 
       - name: Upload telemetry
