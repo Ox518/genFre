@@ -40,27 +40,40 @@ jobs:
       RIG_ID: bench-rig-01
 
     steps:
+      - name: Enable hugepages
+        run: |
+          sudo sysctl -w vm.nr_hugepages=128
+          echo "Hugepages: $(grep HugePages_Total /proc/meminfo)"
+
       - name: Install build deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             build-essential automake autoconf pkg-config \
             libcurl4-openssl-dev libjansson-dev \
-            libssl-dev libgmp-dev
+            libssl-dev libgmp-dev \
+            libnuma-dev libhwloc-dev
 
-      - name: Build cpuminer-multi
+      - name: Build cpuminer-yescryptr16
         run: |
-          git clone --depth=1 https://github.com/tpruvot/cpuminer-multi.git /tmp/cpuminer-multi
-          cd /tmp/cpuminer-multi
+          git clone --depth=1 https://github.com/5mil/cpuminer-yescryptr16.git /tmp/cpuminer
+          cd /tmp/cpuminer
           ./autogen.sh
-          ./configure CFLAGS="-O2" --disable-assembly
+          ./configure \
+            CFLAGS="-O3 -march=native -mavx2 -maes -msse4.2 \
+                    -funroll-loops -fomit-frame-pointer \
+                    -falign-functions=16 -falign-loops=16 \
+                    -fno-strict-aliasing" \
+            --enable-assembly
           make -j$(nproc)
-          echo "cpuminer built: $(/tmp/cpuminer-multi/minerd --version | head -1)"
+          strip -s minerd
+          echo "cpuminer built: $(./minerd --version | head -1)"
+          echo "CPU flags: $(grep -m1 flags /proc/cpuinfo | grep -oE 'avx[^ ]*|sse[^ ]*' | tr '\n' ' ')"
 
       - name: Mine
         run: |
           python3 - << 'PYEOF'
-import subprocess, threading, time, re, os, requests, sys
+import subprocess, threading, time, re, os, json, requests, sys
 
 SUPA_URL  = os.environ["SUPA_URL"]
 SUPA_KEY  = os.environ["SUPA_KEY"]
@@ -87,8 +100,7 @@ def patch(data):
     except Exception as e:
         print(f"[supabase] patch error: {e}")
 
-import re as _re
-m = _re.match(r"stratum\+tcp://([^:]+):(\d+)", POOL_URL)
+m = re.match(r"stratum\+tcp://([^:]+):(\d+)", POOL_URL)
 if not m:
     print(f"[error] Cannot parse pool URL: {POOL_URL}")
     sys.exit(1)
@@ -99,7 +111,7 @@ patch({"status": "connecting", "hashrate": "0", "shares": 0, "errors": 0,
 
 state = {"hashrate": 0.0, "shares": 0, "errors": 0, "accepted": 0, "rejected": 0}
 
-re_accepted = re.compile(r"accepted:\s*(\d+)/(\d+).*?([\d.]+)\s*(kH|MH|H)/s", re.I)
+re_accepted = re.compile(r"accepted:\s*(\d+)/(\d+).*?([\d.]+)\s*(kH|MH|GH|H)/s", re.I)
 re_yay      = re.compile(r"yay!!!", re.I)
 re_boo      = re.compile(r"booooo", re.I)
 re_speed    = re.compile(r"(\d+\.?\d*)\s*(kH|MH|GH|H)/s", re.I)
@@ -129,19 +141,22 @@ def parse_line(line):
     m2 = re_speed.search(line)
     if m2: state["hashrate"] = to_hs(float(m2.group(1)), m2.group(2))
 
+import multiprocessing
+nproc = multiprocessing.cpu_count()
+
 cmd = [
-    "/tmp/cpuminer-multi/minerd",
+    "/tmp/cpuminer/minerd",
     "--algo", "yescryptr16",
     "--url", f"stratum+tcp://{host}:{port}",
     "--user", SUSER,
     "--pass", SPASS,
-    "--threads", "2",
+    "--threads", str(nproc),
     "--timeout", "300",
     "--retries", "-1",
     "--retry-pause", "10",
     "--reconnect",
 ]
-print(f"[worker] launching: {' '.join(cmd)}", flush=True)
+print(f"[worker] launching with {nproc} threads: {' '.join(cmd)}", flush=True)
 
 proc = subprocess.Popen(
     cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
@@ -189,10 +204,35 @@ while True:
 
 proc.wait()
 t.join(timeout=5)
+uptime = int(time.time() - start)
+
 patch({
     "status": "stopped", "hashrate": "0",
     "shares": state["shares"], "errors": state["errors"],
-    "uptime_s": int(time.time() - start),
+    "uptime_s": uptime,
 })
-print(f"[worker] done. shares={state['shares']} errors={state['errors']}", flush=True)
+
+# Write telemetry for diag.yml
+final = {
+    "hashrate": int(state["hashrate"]),
+    "shares": state["shares"],
+    "errors": state["errors"],
+    "uptime_s": uptime,
+    "exit_code": proc.returncode or 0,
+    "pool": POOL_URL,
+    "rig_id": RIG,
+    "worker_id": WID,
+    "threads": nproc,
+}
+with open("/tmp/final.json", "w") as f:
+    json.dump(final, f)
+print(f"[worker] done. shares={state['shares']} errors={state['errors']} uptime={uptime}s", flush=True)
 PYEOF
+
+      - name: Upload telemetry
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: telemetry-${{ github.run_id }}
+          path: /tmp/final.json
+          retention-days: 7
