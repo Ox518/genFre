@@ -1,0 +1,197 @@
+name: GitMine Diagnostics
+# Runs automatically after every bench-worker completion.
+# Also triggerable manually by Perplexity AI to pull a full health report.
+
+on:
+  workflow_run:
+    workflows: ["GitMine Bench Worker"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 'Optional note'
+        required: false
+        default: 'manual'
+
+jobs:
+  diagnose:
+    name: diagnose
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Fetch recent telemetry artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/diag
+
+          curl -s \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/bench-worker.yml/runs?status=completed&per_page=10" \
+            > /tmp/diag/runs.json
+
+          python3 - << 'PYEOF'
+import urllib.request, subprocess, json, os
+
+token = os.environ["GH_TOKEN"]
+repo  = os.environ.get("GITHUB_REPOSITORY", "Ox518/genFre")
+
+with open("/tmp/diag/runs.json") as f:
+    runs_data = json.load(f)
+
+runs = runs_data.get("workflow_runs", [])[:10]
+print(f"Found {len(runs)} completed bench-worker runs")
+logs = []
+
+for run in runs:
+    run_id = run["id"]
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/artifacts",
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            artifacts = json.loads(resp.read())
+    except Exception as e:
+        print(f"[warn] artifacts for run {run_id}: {e}")
+        continue
+    for art in artifacts.get("artifacts", []):
+        if art["name"].startswith("telemetry-"):
+            zip_path = f"/tmp/diag/{run_id}.zip"
+            result = subprocess.run(
+                ["curl", "-s", "-L", "-o", zip_path,
+                 "-H", f"Authorization: Bearer {token}",
+                 art["archive_download_url"]],
+                capture_output=True
+            )
+            if result.returncode == 0:
+                subprocess.run(["unzip", "-o", "-q", zip_path, "-d", f"/tmp/diag/{run_id}"])
+                jp = f"/tmp/diag/{run_id}/final.json"
+                if os.path.exists(jp):
+                    with open(jp) as jf:
+                        tel = json.load(jf)
+                    tel["_gh_conclusion"] = run["conclusion"]
+                    tel["_gh_run_url"]    = run["html_url"]
+                    logs.append(tel)
+                    print(f"[ok] telemetry run {run_id}")
+            break
+
+with open("/tmp/diag/all_logs.json", "w") as f:
+    json.dump(logs, f, indent=2)
+print(f"Loaded {len(logs)} telemetry records")
+PYEOF
+
+      - name: Analyse and write report
+        if: always()
+        run: |
+          python3 - << 'PYEOF'
+import json, os
+
+try:
+    with open("/tmp/diag/all_logs.json") as f:
+        logs = json.load(f)
+except:
+    logs = []
+
+def icon(ok): return "✅" if ok else "❌"
+
+lines = []
+lines.append("# GitMine Platform Diagnostic Report")
+lines.append(f"_Analysed {len(logs)} recent bench-worker runs_")
+lines.append("")
+
+if not logs:
+    lines.append("## ⚠️ No telemetry found")
+    lines.append("No completed bench-worker runs with telemetry artifacts were found.")
+    lines.append("**Likely cause:** bench-worker is not being dispatched at all, or fails before the Mine step.")
+    lines.append("**Next step:** Trigger bench-worker manually from Actions > GitMine Bench Worker > Run workflow.")
+else:
+    total        = len(logs)
+    tcp_ok       = sum(1 for l in logs if l.get("tcp_auth") in ("authorized","got_job"))
+    algo_ok      = sum(1 for l in logs if str(l.get("algo_supported","")).lower() == "true")
+    had_jobs     = sum(1 for l in logs if l.get("first_job_at"))
+    had_shares   = sum(1 for l in logs if l.get("shares_accepted", 0) > 0)
+    total_shares = sum(l.get("shares_accepted", 0) for l in logs)
+    total_errors = sum(l.get("errors", 0) for l in logs)
+    avg_uptime   = sum(l.get("uptime_s", 0) for l in logs) / total
+    avg_hr       = sum(l.get("last_hashrate_hs", 0) for l in logs) / total
+    exit_codes   = [l.get("exit_code") for l in logs]
+    bad_exits    = [c for c in exit_codes if c not in (0, None, -15)]
+
+    lines.append("## Health Overview")
+    lines.append("| Check | Count | Status |")
+    lines.append("|---|---|---|")
+    lines.append(f"| Runs analysed | {total} | — |")
+    lines.append(f"| TCP auth success | {tcp_ok}/{total} | {icon(tcp_ok==total)} |")
+    lines.append(f"| Algo supported | {algo_ok}/{total} | {icon(algo_ok==total)} |")
+    lines.append(f"| Got mining job | {had_jobs}/{total} | {icon(had_jobs==total)} |")
+    lines.append(f"| Got accepted share | {had_shares}/{total} | {'⚠️' if had_shares==0 else '✅'} |")
+    lines.append(f"| Total shares | {total_shares} | {icon(total_shares>0)} |")
+    lines.append(f"| Total errors | {total_errors} | {'✅' if total_errors==0 else '⚠️'} |")
+    lines.append(f"| Bad exit codes | {bad_exits or 'none'} | {icon(not bad_exits)} |")
+    lines.append(f"| Avg uptime | {avg_uptime:.0f}s | — |")
+    lines.append(f"| Avg hashrate | {avg_hr:.0f} H/s | — |")
+    lines.append("")
+
+    issues = []
+    if tcp_ok == 0:
+        issues.append(("❌ CRITICAL", "TCP never authenticated",
+            "Pool rejecting credentials or unreachable. Verify stratum_user/pass and pool host:port."))
+    elif tcp_ok < total:
+        issues.append(("⚠️ WARN", f"TCP auth failed on {total-tcp_ok}/{total} runs",
+            "Intermittent pool connectivity."))
+    if algo_ok == 0:
+        issues.append(("❌ CRITICAL", "yescryptr16 not supported in build",
+            "cpuminer-multi may be compiling without this algo. Check configure output."))
+    if had_jobs == 0:
+        issues.append(("❌ CRITICAL", "No mining jobs ever received",
+            "Miner connects but pool never sends work. Possible IP ban or auth mismatch."))
+    if had_shares == 0 and had_jobs > 0:
+        issues.append(("⚠️ WARN", "No shares accepted",
+            "Jobs received but no shares submitted. Algo mismatch or difficulty too high."))
+    if bad_exits:
+        issues.append(("⚠️ WARN", f"Bad exit codes: {set(bad_exits)}",
+            "cpuminer crashed. See last 30 lines below."))
+
+    if issues:
+        lines.append("## 🔍 Issues Found")
+        for sev, title, detail in issues:
+            lines.append(f"### {sev}: {title}")
+            lines.append(f"> {detail}")
+            lines.append("")
+    else:
+        lines.append("## ✅ Platform Healthy — No Issues Found")
+        lines.append("")
+
+    lines.append("## Per-Run Detail")
+    lines.append("| Run | TCP | Job | Share | Hashrate | Uptime | Exit | Link |")
+    lines.append("|---|---|---|---|---|---|---|---|")
+    for l in logs:
+        tcp = "✅" if l.get("tcp_auth") in ("authorized","got_job") else "❌"
+        job = "✅" if l.get("first_job_at") else "❌"
+        shr = f"✅ {l.get('shares_accepted',0)}" if l.get("shares_accepted",0)>0 else "❌"
+        hr  = f"{l.get('last_hashrate_hs',0)} H/s"
+        up  = f"{l.get('uptime_s',0)}s"
+        ex  = str(l.get("exit_code","?"))
+        url = f"[view]({l.get('_gh_run_url','#')})"
+        rid = str(l.get("run_id","?"))[-6:]
+        lines.append(f"| ...{rid} | {tcp} | {job} | {shr} | {hr} | {up} | {ex} | {url} |")
+    lines.append("")
+
+    last = logs[0]
+    lines.append("## Last 30 Miner Lines (most recent run)")
+    lines.append("```")
+    for l in last.get("last_30_lines", []):
+        lines.append(l)
+    lines.append("```")
+
+with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+    f.write("\n".join(lines) + "\n")
+
+print("Diagnostic report written.")
+PYEOF
