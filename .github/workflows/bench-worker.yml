@@ -104,36 +104,27 @@ jobs:
           fi
           echo "[preflight] TCP reachable ✓"
 
-      - name: Build cpuminer-opt
+      - name: Build cpuminer-opt (Ox518/cpuminer-opt)
         id: build
         run: |
-          echo "[build] detecting CPU features for optimal CFLAGS ..."
-          CFLAGS="-O3 -march=native -funroll-loops -fomit-frame-pointer -fno-strict-aliasing"
-          grep -q avx512f /proc/cpuinfo && CFLAGS="$CFLAGS -mavx512f -mavx512vl -mavx512bw -mavx512dq" && echo "[build] +AVX512"
-          grep -q avx2    /proc/cpuinfo && CFLAGS="$CFLAGS -mavx2"  && echo "[build] +AVX2"
-          grep -q aes     /proc/cpuinfo && CFLAGS="$CFLAGS -maes"   && echo "[build] +AES"
-          grep -q sha_ni  /proc/cpuinfo && CFLAGS="$CFLAGS -msha"   && echo "[build] +SHA"
-          grep -q sse4_2  /proc/cpuinfo && CFLAGS="$CFLAGS -msse4.2" && echo "[build] +SSE4.2"
-          grep -q vaes    /proc/cpuinfo && CFLAGS="$CFLAGS -mvaes"  && echo "[build] +VAES"
-          echo "[build] CFLAGS=$CFLAGS"
-
-          git clone --depth=1  https://github.com/Ox518/cpuminer-opt.git /tmp/cpuminer 2>&1 || {
+          git clone --depth=1 https://github.com/Ox518/cpuminer-opt.git /tmp/cpuminer 2>&1 || {
             echo "[error] BUILD_CLONE_FAIL"; exit 1
           }
           cd /tmp/cpuminer
 
-          ./build.sh 2>&1 || {
-            echo "[build] build.sh failed, trying manual configure"
-            ./autogen.sh 2>&1 || { echo "[error] BUILD_AUTOGEN_FAIL"; exit 1; }
-            ./configure CFLAGS="$CFLAGS" 2>&1 || { echo "[error] BUILD_CONFIGURE_FAIL"; exit 1; }
-            make -j$(nproc) 2>&1 || { echo "[error] BUILD_MAKE_FAIL"; exit 1; }
-          }
+          echo "[build] running Ox518/cpuminer-opt build.sh ..."
+          bash build.sh 2>&1
+          BUILD_EXIT=$?
+
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo "[error] BUILD_FAILED (exit $BUILD_EXIT)"
+            exit 1
+          fi
 
           [ ! -f ./cpuminer ] && { echo "[error] BUILD_BINARY_MISSING"; exit 1; }
-          strip -s cpuminer
-          echo "[build] done: $(./cpuminer --version | head -1)"
+          echo "[build] done: $(./cpuminer --version 2>&1 | head -1)"
 
-          # Compute optimal thread count: physical cores only (no HT)
+          # HT-aware thread count: physical cores only
           LOGICAL=$(nproc)
           HT=$(lscpu 2>/dev/null | grep 'Thread(s) per core' | awk '{print $4}' || echo 1)
           HT=${HT:-1}
@@ -161,7 +152,6 @@ jobs:
           BINARY    = "/tmp/cpuminer/cpuminer"
           STATSFILE = "/tmp/cpuminer-stats.json"
 
-          # Use HT-aware thread count computed in build step
           try:
               NTHREADS = int(os.environ.get("OPTIMAL_THREADS", str(multiprocessing.cpu_count())))
           except:
@@ -205,7 +195,6 @@ jobs:
           state = {"hashrate": 0.0, "shares": 0, "errors": 0,
                    "accepted": 0, "rejected": 0, "last_error": ""}
 
-          # Stdout regexes as fallback if statsfile not yet written
           re_opt_acc = re.compile(r'(\d+)\s+Accepted\s+(\d+)\s+S\d+\s+R(\d+)', re.I)
           re_ttf     = re.compile(r'TTF\s*@\s*([\d.]+)\s*(h/s|kh/s|mh/s|gh/s)', re.I)
           re_speed   = re.compile(r'([\d.]+)\s*(kH|MH|GH|H)/s', re.I)
@@ -219,11 +208,9 @@ jobs:
               return val
 
           def read_statsfile():
-              """Read cpuminer-opt --statsfile JSON. Returns True if updated state."""
               try:
                   with open(STATSFILE) as f:
                       raw = f.read().strip()
-                  # statsfile may have multiple JSON objects; take last complete one
                   last = None
                   for line in raw.splitlines():
                       line = line.strip()
@@ -232,9 +219,7 @@ jobs:
                           except: pass
                   if not last:
                       last = json.loads(raw)
-                  # cpuminer-opt statsfile keys: KHS, accepted, rejected, hw_errors
-                  khs = float(last.get("KHS", last.get("HS", 0)))
-                  # KHS field is already in kH/s
+                  khs  = float(last.get("KHS", last.get("HS", 0)))
                   unit = "KHS" if "KHS" in last else "HS"
                   state["hashrate"]  = khs * 1e3 if unit == "KHS" else khs
                   state["accepted"]  = int(last.get("accepted", state["accepted"]))
@@ -332,7 +317,6 @@ jobs:
                       patch({"status": "error", "last_error": msg})
                   break
 
-              # Prefer statsfile over stdout regex
               read_statsfile()
 
               if elapsed > 30:
@@ -374,7 +358,7 @@ jobs:
           proc.wait()
           t.join(timeout=5)
           uptime = int(time.time() - start)
-          read_statsfile()  # final read
+          read_statsfile()
 
           patch({
               "status":   "stopped", "hashrate": "0",
