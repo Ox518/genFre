@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       worker_id:
-        description: 'bench_workers row UUID'
+        description: 'bench_workers row UUID (Supabase)'
         required: true
       pool_url:
-        description: 'stratum+tcp://host:port'
+        description: 'stratum+tcp://host:port  (Fennec/Trinity external pool)'
         required: true
         default: 'stratum+tcp://americas.mining-dutch.nl:9983'
       stratum_user:
-        description: 'Stratum username (e.g. 5mil.worker7)'
+        description: 'Stratum username  e.g. 5mil.worker7'
         required: false
         default: '5mil.worker7'
       stratum_pass:
@@ -19,9 +19,13 @@ on:
         required: false
         default: 'x'
       duration:
-        description: 'Mining duration in minutes'
+        description: 'Mining duration in minutes  (max 55)'
         required: false
         default: '30'
+      algo:
+        description: 'Algorithm: yescryptr16 (FNNC) or sha256d (TTY)'
+        required: false
+        default: 'yescryptr16'
 
 jobs:
   mine:
@@ -30,19 +34,48 @@ jobs:
     timeout-minutes: 60
 
     env:
-      SUPA_URL: ${{ secrets.SUPAURL }}
-      SUPA_KEY: ${{ secrets.BENCHANONKEY }}
-      WORKER_ID: ${{ github.event.inputs.worker_id }}
-      POOL_URL: ${{ github.event.inputs.pool_url }}
-      SUSER: ${{ github.event.inputs.stratum_user }}
-      SPASS: ${{ github.event.inputs.stratum_pass }}
+      SUPA_URL:     ${{ secrets.SUPAURL }}
+      SUPA_KEY:     ${{ secrets.BENCHANONKEY }}
+      WORKER_ID:    ${{ github.event.inputs.worker_id }}
+      POOL_URL:     ${{ github.event.inputs.pool_url }}
+      SUSER:        ${{ github.event.inputs.stratum_user }}
+      SPASS:        ${{ github.event.inputs.stratum_pass }}
       DURATION_MIN: ${{ github.event.inputs.duration }}
-      RIG_ID: bench-rig-01
+      ALGO:         ${{ github.event.inputs.algo }}
+      RIG_ID:       bench-rig-01
 
     steps:
+      - name: Validate inputs
+        run: |
+          python3 - << 'PYEOF'
+          import os, sys, re
+          pool = os.environ.get("POOL_URL", "")
+          algo = os.environ.get("ALGO", "yescryptr16")
+          dur  = os.environ.get("DURATION_MIN", "30")
+          wid  = os.environ.get("WORKER_ID", "")
+          errors = []
+          if not re.match(r'^stratum\+tcp://[^:]+:\d+$', pool):
+              errors.append(f"BAD_POOL_URL: '{pool}' — must be stratum+tcp://host:port")
+          if algo not in ("yescryptr16", "sha256d"):
+              errors.append(f"BAD_ALGO: '{algo}' — must be yescryptr16 or sha256d")
+          try:
+              d = int(dur)
+              if d < 1 or d > 55:
+                  errors.append(f"BAD_DURATION: {d} — must be 1-55 minutes")
+          except ValueError:
+              errors.append(f"BAD_DURATION: '{dur}' is not an integer")
+          if not wid:
+              errors.append("MISSING_WORKER_ID: worker_id is required")
+          if errors:
+              for e in errors:
+                  print(f"[error] {e}", flush=True)
+              sys.exit(1)
+          print(f"[validate] pool={pool} algo={algo} dur={dur}min wid={wid}", flush=True)
+          PYEOF
+
       - name: Enable hugepages
         run: |
-          sudo sysctl -w vm.nr_hugepages=128
+          sudo sysctl -w vm.nr_hugepages=128 || true
           echo "Hugepages: $(grep HugePages_Total /proc/meminfo)"
 
       - name: Install build deps
@@ -52,182 +85,264 @@ jobs:
             build-essential automake autoconf pkg-config \
             libcurl4-openssl-dev libjansson-dev \
             libssl-dev libgmp-dev \
-            libnuma-dev libhwloc-dev
+            libnuma-dev libhwloc-dev \
+            netcat-openbsd
 
-      - name: Build cpuminer-yescryptr16
+      - name: Pre-flight TCP check
         run: |
-          git clone --depth=1 https://github.com/5mil/cpuminer-yescryptr16.git /tmp/cpuminer
+          HOST=$(echo "$POOL_URL" | sed 's|stratum+tcp://||' | cut -d: -f1)
+          PORT=$(echo "$POOL_URL" | sed 's|stratum+tcp://||' | cut -d: -f2)
+          echo "[preflight] testing $HOST:$PORT ..."
+          if ! timeout 10 bash -c "echo '' | nc -w 5 $HOST $PORT" 2>/dev/null; then
+            echo "[error] PREFLIGHT_TCP_FAIL: cannot reach $HOST:$PORT — aborting to save runner minutes"
+            exit 1
+          fi
+          echo "[preflight] TCP reachable ✓"
+
+      - name: Build cpuminer
+        id: build
+        run: |
+          ALGO="${ALGO:-yescryptr16}"
+          echo "[build] cloning cpuminer for algo=$ALGO"
+          git clone --depth=1 https://github.com/5mil/cpuminer-yescryptr16.git /tmp/cpuminer 2>&1 || {
+            echo "[error] BUILD_CLONE_FAIL: git clone failed — possible network issue or repo unavailable"
+            exit 1
+          }
           cd /tmp/cpuminer
-          ./autogen.sh
+          ./autogen.sh 2>&1 || { echo "[error] BUILD_AUTOGEN_FAIL"; exit 1; }
           ./configure \
             CFLAGS="-O3 -march=native -mavx2 -maes -msse4.2 \
                     -funroll-loops -fomit-frame-pointer \
                     -falign-functions=16 -falign-loops=16 \
                     -fno-strict-aliasing" \
-            --enable-assembly
-          make -j$(nproc)
+            --enable-assembly 2>&1 || { echo "[error] BUILD_CONFIGURE_FAIL"; exit 1; }
+          make -j$(nproc) 2>&1 || { echo "[error] BUILD_MAKE_FAIL"; exit 1; }
+          if [ ! -f ./minerd ]; then
+            echo "[error] BUILD_BINARY_MISSING: minerd not found after make"
+            exit 1
+          fi
           strip -s minerd
-          echo "cpuminer built: $(./minerd --version | head -1)"
+          echo "[build] cpuminer built: $(./minerd --version | head -1)"
           echo "CPU flags: $(grep -m1 flags /proc/cpuinfo | grep -oE 'avx[^ ]*|sse[^ ]*' | tr '\n' ' ')"
 
       - name: Mine
         run: |
           python3 - << 'PYEOF'
-import subprocess, threading, time, re, os, json, requests, sys
+          import subprocess, threading, time, re, os, json, sys
+          import urllib.request
+          import multiprocessing
 
-SUPA_URL  = os.environ["SUPA_URL"]
-SUPA_KEY  = os.environ["SUPA_KEY"]
-WID       = os.environ["WORKER_ID"]
-POOL_URL  = os.environ["POOL_URL"]
-SUSER     = os.environ.get("SUSER", "5mil.worker7")
-SPASS     = os.environ.get("SPASS", "x")
-DURATION  = int(os.environ.get("DURATION_MIN", "30")) * 60
-RIG       = os.environ.get("RIG_ID", "bench-rig-01")
+          SUPA_URL  = os.environ.get("SUPA_URL", "")
+          SUPA_KEY  = os.environ.get("SUPA_KEY", "")
+          WID       = os.environ.get("WORKER_ID", "")
+          POOL_URL  = os.environ.get("POOL_URL", "")
+          SUSER     = os.environ.get("SUSER",  "bench")
+          SPASS     = os.environ.get("SPASS",  "x")
+          ALGO      = os.environ.get("ALGO",   "yescryptr16")
+          DURATION  = min(int(os.environ.get("DURATION_MIN", "30")), 55) * 60
+          RIG       = os.environ.get("RIG_ID", "bench-rig-01")
+          NPROC     = multiprocessing.cpu_count()
 
-HDRS = {
-    "apikey": SUPA_KEY,
-    "Authorization": f"Bearer {SUPA_KEY}",
-    "Content-Type": "application/json",
-    "Prefer": "return=minimal"
-}
+          def patch(data, retries=3):
+              if not SUPA_URL or not SUPA_KEY or not WID:
+                  return
+              for attempt in range(retries):
+                  try:
+                      body = json.dumps(data).encode()
+                      req  = urllib.request.Request(
+                          f"{SUPA_URL}/rest/v1/bench_workers?id=eq.{WID}",
+                          data=body, method="PATCH",
+                          headers={
+                              "apikey": SUPA_KEY,
+                              "Authorization": f"Bearer {SUPA_KEY}",
+                              "Content-Type": "application/json",
+                              "Prefer": "return=minimal",
+                          }
+                      )
+                      urllib.request.urlopen(req, timeout=10)
+                      return
+                  except Exception as e:
+                      if attempt < retries - 1:
+                          time.sleep(2 ** attempt)
+                      else:
+                          print(f"[supabase] patch failed after {retries} attempts: {e}", flush=True)
 
-def patch(data):
-    try:
-        requests.patch(
-            f"{SUPA_URL}/rest/v1/bench_workers?id=eq.{WID}",
-            json=data, headers=HDRS, timeout=10
-        )
-    except Exception as e:
-        print(f"[supabase] patch error: {e}")
+          m = re.match(r"stratum\+tcp://([^:]+):(\d+)", POOL_URL)
+          if not m:
+              msg = f"INVALID_POOL_URL: '{POOL_URL}'"
+              print(f"[error] {msg}", flush=True)
+              patch({"status": "error", "last_error": msg})
+              sys.exit(1)
+          host, port = m.group(1), m.group(2)
 
-m = re.match(r"stratum\+tcp://([^:]+):(\d+)", POOL_URL)
-if not m:
-    print(f"[error] Cannot parse pool URL: {POOL_URL}")
-    sys.exit(1)
-host, port = m.group(1), m.group(2)
+          patch({"status": "connecting", "hashrate": "0", "shares": 0, "errors": 0,
+                 "rig_id": RIG, "pool_url": POOL_URL, "algo": ALGO})
 
-patch({"status": "connecting", "hashrate": "0", "shares": 0, "errors": 0,
-       "rig_id": RIG, "pool_url": POOL_URL})
+          state = {"hashrate": 0.0, "shares": 0, "errors": 0,
+                   "accepted": 0, "rejected": 0, "last_error": ""}
 
-state = {"hashrate": 0.0, "shares": 0, "errors": 0, "accepted": 0, "rejected": 0}
+          re_accepted = re.compile(r"accepted:\s*(\d+)/(\d+).*?([\d.]+)\s*(kH|MH|GH|H)/s", re.I)
+          re_yay      = re.compile(r"yay!!!", re.I)
+          re_boo      = re.compile(r"booooo", re.I)
+          re_speed    = re.compile(r"([\d.]+)\s*(kH|MH|GH|H)/s", re.I)
+          re_error    = re.compile(r"error|disconnected|rejected|failed|connection refused|timed out", re.I)
 
-re_accepted = re.compile(r"accepted:\s*(\d+)/(\d+).*?([\d.]+)\s*(kH|MH|GH|H)/s", re.I)
-re_yay      = re.compile(r"yay!!!", re.I)
-re_boo      = re.compile(r"booooo", re.I)
-re_speed    = re.compile(r"(\d+\.?\d*)\s*(kH|MH|GH|H)/s", re.I)
+          def to_hs(val, unit):
+              u = unit.lower()
+              if u == "kh": return val * 1e3
+              if u == "mh": return val * 1e6
+              if u == "gh": return val * 1e9
+              return val
 
-def to_hs(val, unit):
-    unit = unit.lower()
-    if unit == "kh": return val * 1e3
-    if unit == "mh": return val * 1e6
-    if unit == "gh": return val * 1e9
-    return val
+          def parse_line(line):
+              line = line.strip()
+              if not line: return
+              print(f"[miner] {line}", flush=True)
+              m = re_accepted.search(line)
+              if m:
+                  state["accepted"] = int(m.group(1))
+                  state["rejected"] = int(m.group(2)) - state["accepted"]
+                  state["errors"]   = state["rejected"]
+                  state["shares"]   = state["accepted"]
+                  state["hashrate"] = to_hs(float(m.group(3)), m.group(4))
+                  return
+              if re_yay.search(line): state["shares"] += 1; return
+              if re_boo.search(line):
+                  state["errors"] += 1
+                  state["last_error"] = line[:120]
+                  return
+              if re_error.search(line):
+                  state["last_error"] = line[:120]
+              m2 = re_speed.search(line)
+              if m2: state["hashrate"] = to_hs(float(m2.group(1)), m2.group(2))
 
-def parse_line(line):
-    line = line.strip()
-    if not line: return
-    print(f"[miner] {line}", flush=True)
-    m = re_accepted.search(line)
-    if m:
-        state["accepted"] = int(m.group(1))
-        total = int(m.group(2))
-        state["rejected"] = total - state["accepted"]
-        state["errors"] = state["rejected"]
-        state["shares"] = state["accepted"]
-        state["hashrate"] = to_hs(float(m.group(3)), m.group(4))
-        return
-    if re_yay.search(line): state["shares"] += 1; return
-    if re_boo.search(line): state["errors"] += 1; return
-    m2 = re_speed.search(line)
-    if m2: state["hashrate"] = to_hs(float(m2.group(1)), m2.group(2))
+          cmd = [
+              "/tmp/cpuminer/minerd",
+              "--algo",        ALGO,
+              "--url",         f"stratum+tcp://{host}:{port}",
+              "--user",        SUSER,
+              "--pass",        SPASS,
+              "--threads",     str(NPROC),
+              "--timeout",     "300",
+              "--retries",     "-1",
+              "--retry-pause", "10",
+              "--reconnect",
+          ]
+          print(f"[worker] launching {NPROC} threads: {' '.join(cmd)}", flush=True)
 
-import multiprocessing
-nproc = multiprocessing.cpu_count()
+          try:
+              proc = subprocess.Popen(
+                  cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                  text=True, bufsize=1
+              )
+          except FileNotFoundError:
+              msg = "BINARY_NOT_FOUND: /tmp/cpuminer/minerd — build step may have failed silently"
+              print(f"[error] {msg}", flush=True)
+              patch({"status": "error", "last_error": msg})
+              sys.exit(1)
+          except Exception as e:
+              msg = f"LAUNCH_FAIL: {e}"
+              print(f"[error] {msg}", flush=True)
+              patch({"status": "error", "last_error": msg})
+              sys.exit(1)
 
-cmd = [
-    "/tmp/cpuminer/minerd",
-    "--algo", "yescryptr16",
-    "--url", f"stratum+tcp://{host}:{port}",
-    "--user", SUSER,
-    "--pass", SPASS,
-    "--threads", str(nproc),
-    "--timeout", "300",
-    "--retries", "-1",
-    "--retry-pause", "10",
-    "--reconnect",
-]
-print(f"[worker] launching with {nproc} threads: {' '.join(cmd)}", flush=True)
+          patch({"status": "mining"})
 
-proc = subprocess.Popen(
-    cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
-)
-patch({"status": "mining"})
+          def tail():
+              try:
+                  for line in proc.stdout:
+                      parse_line(line)
+              except Exception as e:
+                  print(f"[warn] tail thread error: {e}", flush=True)
 
-def tail():
-    for line in proc.stdout:
-        parse_line(line)
+          t = threading.Thread(target=tail, daemon=True)
+          t.start()
 
-t = threading.Thread(target=tail, daemon=True)
-t.start()
+          start       = time.time()
+          last_report = 0
+          stall_start = None
+          STALL_LIMIT = 90
 
-start = time.time()
-last_report = 0
-while True:
-    now = time.time()
-    elapsed = now - start
-    if elapsed >= DURATION:
-        print(f"[worker] duration reached ({DURATION}s), stopping", flush=True)
-        proc.terminate()
-        break
-    if proc.poll() is not None:
-        print(f"[worker] cpuminer exited with code {proc.returncode}", flush=True)
-        break
-    if now - last_report >= 15:
-        hr_int = int(state["hashrate"])
-        patch({
-            "status": "mining",
-            "hashrate": str(hr_int),
-            "shares": state["shares"],
-            "errors": state["errors"],
-            "uptime_s": int(elapsed),
-            "stratum_job": {
-                "host": host, "port": int(port),
-                "authorized": True, "difficulty": 1,
-                "subscribed": True,
-                "accepted": state["accepted"],
-                "rejected": state["rejected"],
-            }
-        })
-        print(f"[report] uptime={int(elapsed)}s hr={hr_int} shares={state['shares']} errors={state['errors']}", flush=True)
-        last_report = now
-    time.sleep(1)
+          while True:
+              now     = time.time()
+              elapsed = now - start
 
-proc.wait()
-t.join(timeout=5)
-uptime = int(time.time() - start)
+              if elapsed >= DURATION:
+                  print(f"[worker] duration reached ({DURATION}s), stopping", flush=True)
+                  proc.terminate()
+                  break
 
-patch({
-    "status": "stopped", "hashrate": "0",
-    "shares": state["shares"], "errors": state["errors"],
-    "uptime_s": uptime,
-})
+              rc = proc.poll()
+              if rc is not None:
+                  if rc not in (0, -15):
+                      msg = f"MINER_CRASH: cpuminer exited with code {rc}"
+                      print(f"[error] {msg}", flush=True)
+                      patch({"status": "error", "last_error": msg})
+                  break
 
-# Write telemetry for diag.yml
-final = {
-    "hashrate": int(state["hashrate"]),
-    "shares": state["shares"],
-    "errors": state["errors"],
-    "uptime_s": uptime,
-    "exit_code": proc.returncode or 0,
-    "pool": POOL_URL,
-    "rig_id": RIG,
-    "worker_id": WID,
-    "threads": nproc,
-}
-with open("/tmp/final.json", "w") as f:
-    json.dump(final, f)
-print(f"[worker] done. shares={state['shares']} errors={state['errors']} uptime={uptime}s", flush=True)
-PYEOF
+              if elapsed > 30:
+                  if state["hashrate"] == 0:
+                      if stall_start is None:
+                          stall_start = now
+                      elif (now - stall_start) > STALL_LIMIT:
+                          msg = f"STALL_DETECTED: hashrate=0 for >{STALL_LIMIT}s — possible algo mismatch or pool not sending jobs"
+                          print(f"[error] {msg}", flush=True)
+                          patch({"status": "error", "last_error": msg})
+                          proc.terminate()
+                          break
+                  else:
+                      stall_start = None
+
+              if now - last_report >= 15:
+                  hr_int = int(state["hashrate"])
+                  patch({
+                      "status": "mining",
+                      "hashrate": str(hr_int),
+                      "shares":   state["shares"],
+                      "errors":   state["errors"],
+                      "uptime_s": int(elapsed),
+                      "last_error": state["last_error"],
+                      "stratum_job": {
+                          "host": host, "port": int(port),
+                          "algo": ALGO,
+                          "accepted": state["accepted"],
+                          "rejected": state["rejected"],
+                      }
+                  })
+                  print(f"[report] uptime={int(elapsed)}s hr={hr_int} shares={state['shares']} errors={state['errors']} last_error={state['last_error'][:60] or 'none'}", flush=True)
+                  last_report = now
+
+              time.sleep(1)
+
+          proc.wait()
+          t.join(timeout=5)
+          uptime = int(time.time() - start)
+
+          patch({
+              "status": "stopped", "hashrate": "0",
+              "shares": state["shares"], "errors": state["errors"],
+              "uptime_s": uptime, "last_error": state["last_error"],
+          })
+
+          final = {
+              "hashrate":   int(state["hashrate"]),
+              "shares":     state["shares"],
+              "errors":     state["errors"],
+              "uptime_s":   uptime,
+              "exit_code":  proc.returncode or 0,
+              "pool":       POOL_URL,
+              "algo":       ALGO,
+              "rig_id":     RIG,
+              "worker_id":  WID,
+              "threads":    NPROC,
+              "last_error": state["last_error"],
+              "accepted":   state["accepted"],
+              "rejected":   state["rejected"],
+          }
+          with open("/tmp/final.json", "w") as f:
+              json.dump(final, f)
+          print(f"[worker] done — shares={state['shares']} errors={state['errors']} uptime={uptime}s exit={proc.returncode}", flush=True)
+          PYEOF
 
       - name: Upload telemetry
         uses: actions/upload-artifact@v4

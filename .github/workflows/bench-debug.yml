@@ -15,8 +15,12 @@ on:
         description: 'Stratum password'
         required: false
         default: 'x'
+      algo:
+        description: 'Algorithm: yescryptr16 or sha256d'
+        required: false
+        default: 'yescryptr16'
       duration:
-        description: 'Mining duration seconds'
+        description: 'Mining duration in seconds (for debug sample)'
         required: false
         default: '120'
 
@@ -27,141 +31,171 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      - name: Validate inputs
+        run: |
+          python3 -c "
+import sys, re
+pool = '${{ github.event.inputs.pool_url }}'
+algo = '${{ github.event.inputs.algo }}'
+errors = []
+if not re.match(r'^stratum\\+tcp://[^:]+:\\d+$', pool):
+    errors.append(f\"BAD_POOL_URL: '{pool}'\")
+if algo not in ('yescryptr16', 'sha256d'):
+    errors.append(f\"BAD_ALGO: '{algo}'\")
+if errors:
+    for e in errors: print(f'[error] {e}')
+    sys.exit(1)
+print('[validate] inputs OK')
+"
+
       - name: Init log
         run: |
           mkdir -p /tmp/diag
           LOG=/tmp/diag/bench-debug.log
-          echo "BENCH-DEBUG LOG" > $LOG
-          echo "run_id   : ${{ github.run_id }}" >> $LOG
+          echo "BENCH-DEBUG LOG"                                   > $LOG
+          echo "run_id   : ${{ github.run_id }}"                  >> $LOG
           echo "run_url  : https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $LOG
-          echo "timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $LOG
-          echo "pool_url : ${{ github.event.inputs.pool_url }}" >> $LOG
+          echo "timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"       >> $LOG
+          echo "pool_url : ${{ github.event.inputs.pool_url }}"   >> $LOG
           echo "user     : ${{ github.event.inputs.stratum_user }}" >> $LOG
-          echo "duration : ${{ github.event.inputs.duration }}s" >> $LOG
-          echo "runner   : $(uname -a)" >> $LOG
-          echo "cpus     : $(nproc)" >> $LOG
-          echo "ram      : $(free -h | awk '/Mem/{print $2}')" >> $LOG
+          echo "algo     : ${{ github.event.inputs.algo }}"       >> $LOG
+          echo "duration : ${{ github.event.inputs.duration }}s"  >> $LOG
+          echo "runner   : $(uname -a)"                           >> $LOG
+          echo "cpus     : $(nproc)"                              >> $LOG
+          echo "ram      : $(free -h | awk '/Mem/{print $2}')"    >> $LOG
           echo "cpu_flags: $(grep -m1 flags /proc/cpuinfo | grep -oE 'avx[^ ]*|sse[^ ]*' | tr '\n' ' ')" >> $LOG
-          echo "" >> $LOG
 
-      - name: "[1] TCP stratum handshake"
-        run: |
-          LOG=/tmp/diag/bench-debug.log
-          HOST=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f1)
-          PORT=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f2)
-          echo "=== [1] RAW TCP STRATUM HANDSHAKE ===" >> $LOG
-          echo "host=$HOST port=$PORT" >> $LOG
-          RESULT=$(timeout 15 bash -c "(
-            printf '{"id":1,"method":"mining.subscribe","params":["cpuminer/2.5"]}\n'
-            sleep 3
-            printf '{"id":2,"method":"mining.authorize","params":["${{ github.event.inputs.stratum_user }}","${{ github.event.inputs.stratum_pass }}"]}\n'
-            sleep 5
-          ) | nc $HOST $PORT 2>&1" || true)
-          echo "$RESULT" >> $LOG
-          if echo "$RESULT" | grep -q '"result":true'; then
-            echo "TCP_AUTH=AUTHORIZED" >> $LOG
-          elif echo "$RESULT" | grep -q '"result":false'; then
-            echo "TCP_AUTH=REJECTED" >> $LOG
-          elif echo "$RESULT" | grep -q 'mining.notify'; then
-            echo "TCP_AUTH=GOT_JOB_NO_AUTH_RESPONSE" >> $LOG
-          elif [ -z "$RESULT" ]; then
-            echo "TCP_AUTH=NO_RESPONSE_CONNECTION_REFUSED" >> $LOG
-          else
-            echo "TCP_AUTH=UNKNOWN" >> $LOG
-          fi
-          echo "" >> $LOG
-
-      - name: Install build deps
+      - name: Install deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             build-essential automake autoconf pkg-config \
             libcurl4-openssl-dev libjansson-dev \
-            libssl-dev libgmp-dev
+            libssl-dev libgmp-dev \
+            netcat-openbsd
 
-      - name: "[2] Build cpuminer-yescryptr16 (AVX2)"
+      - name: "[1] DNS + TCP reachability"
         run: |
           LOG=/tmp/diag/bench-debug.log
-          echo "=== [2] BUILD CPUMINER (yescryptr16 + AVX2) ===" >> $LOG
-          git clone --depth=1 https://github.com/5mil/cpuminer-yescryptr16.git /tmp/cpuminer 2>&1 | tail -3 >> $LOG
+          HOST=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f1)
+          PORT=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f2)
+          echo "=== [1] DNS + TCP REACHABILITY ===" >> $LOG
+          echo "host=$HOST  port=$PORT" >> $LOG
+          if host "$HOST" > /dev/null 2>&1; then
+            IP=$(host "$HOST" | grep "has address" | head -1 | awk '{print $NF}')
+            echo "DNS_RESOLVE=OK  ip=$IP" >> $LOG
+          else
+            echo "DNS_RESOLVE=FAIL — hostname cannot be resolved" >> $LOG
+          fi
+          if timeout 10 bash -c "echo '' | nc -w 5 $HOST $PORT" 2>/dev/null; then
+            echo "TCP_CONNECT=OK" >> $LOG
+          else
+            echo "TCP_CONNECT=FAIL — refused or timeout" >> $LOG
+          fi
+
+      - name: "[2] Stratum handshake"
+        run: |
+          LOG=/tmp/diag/bench-debug.log
+          HOST=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f1)
+          PORT=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f2)
+          echo "=== [2] RAW STRATUM HANDSHAKE ===" >> $LOG
+          RESULT=$(timeout 15 bash -c "(
+            printf '{\"id\":1,\"method\":\"mining.subscribe\",\"params\":[\"cpuminer/2.5\"]}\n'
+            sleep 3
+            printf '{\"id\":2,\"method\":\"mining.authorize\",\"params\":[\"${{ github.event.inputs.stratum_user }}\",\"${{ github.event.inputs.stratum_pass }}\"]}\n'
+            sleep 5
+          ) | nc -w 8 $HOST $PORT 2>&1" || true)
+          echo "$RESULT" >> $LOG
+          if echo "$RESULT" | grep -q '\"result\":true'; then
+            echo "STRATUM_AUTH=AUTHORIZED" >> $LOG
+          elif echo "$RESULT" | grep -q '\"result\":false'; then
+            echo "STRATUM_AUTH=REJECTED — wrong username or password" >> $LOG
+          elif echo "$RESULT" | grep -q 'mining.notify'; then
+            echo "STRATUM_AUTH=GOT_JOB_NO_AUTH_CONFIRM" >> $LOG
+          elif [ -z "$RESULT" ]; then
+            echo "STRATUM_AUTH=NO_RESPONSE" >> $LOG
+          else
+            echo "STRATUM_AUTH=UNKNOWN" >> $LOG
+          fi
+
+      - name: "[3] Build cpuminer"
+        run: |
+          LOG=/tmp/diag/bench-debug.log
+          ALGO="${{ github.event.inputs.algo }}"
+          echo "=== [3] BUILD CPUMINER ($ALGO) ===" >> $LOG
+          git clone --depth=1 https://github.com/5mil/cpuminer-yescryptr16.git /tmp/cpuminer 2>&1 | tail -5 >> $LOG || {
+            echo "BUILD_RESULT=CLONE_FAIL" >> $LOG; exit 0
+          }
           cd /tmp/cpuminer
-          ./autogen.sh >> $LOG 2>&1
+          ./autogen.sh >> $LOG 2>&1 || { echo "BUILD_RESULT=AUTOGEN_FAIL" >> $LOG; exit 0; }
           ./configure \
-            CFLAGS="-O3 -march=native -mavx2 -maes -msse4.2 -funroll-loops -fomit-frame-pointer -falign-functions=16 -fno-strict-aliasing" \
+            CFLAGS="-O3 -march=native -mavx2 -maes -msse4.2 -funroll-loops -fomit-frame-pointer -fno-strict-aliasing" \
             --enable-assembly >> $LOG 2>&1
           make -j$(nproc) >> $LOG 2>&1
           BUILD_EXIT=$?
           echo "build_exit=$BUILD_EXIT" >> $LOG
           strip -s /tmp/cpuminer/minerd 2>/dev/null || true
-          if [ $BUILD_EXIT -eq 0 ]; then
-            VERSION=$(/tmp/cpuminer/minerd --version 2>&1 | head -1)
-            echo "version=$VERSION" >> $LOG
-            echo "cpu_simd=$(grep -m1 flags /proc/cpuinfo | grep -oE 'avx[^ ]*' | head -3 | tr '\n' ' ')" >> $LOG
+          if [ $BUILD_EXIT -eq 0 ] && [ -f /tmp/cpuminer/minerd ]; then
+            echo "BUILD_RESULT=OK" >> $LOG
+            echo "version=$(/tmp/cpuminer/minerd --version 2>&1 | head -1)" >> $LOG
           else
-            echo "BUILD FAILED — check log above" >> $LOG
+            echo "BUILD_RESULT=FAIL" >> $LOG
           fi
-          echo "" >> $LOG
 
-      - name: "[3] Mine with --debug"
+      - name: "[4] Mine with --debug"
         run: |
           LOG=/tmp/diag/bench-debug.log
           HOST=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f1)
           PORT=$(echo "${{ github.event.inputs.pool_url }}" | sed 's|stratum+tcp://||' | cut -d: -f2)
           DURATION=${{ github.event.inputs.duration }}
-          echo "=== [3] CPUMINER --debug OUTPUT ===" >> $LOG
-          timeout $DURATION /tmp/cpuminer/minerd \
-            --algo yescryptr16 \
-            --url stratum+tcp://$HOST:$PORT \
-            --user ${{ github.event.inputs.stratum_user }} \
-            --pass ${{ github.event.inputs.stratum_pass }} \
-            --threads $(nproc) \
-            --timeout 300 \
-            --retries -1 \
-            --retry-pause 10 \
-            --reconnect \
-            --debug \
-            2>&1 | tee -a $LOG || true
-          echo "mine_exit=$?" >> $LOG
-          echo "" >> $LOG
+          ALGO=${{ github.event.inputs.algo }}
+          echo "=== [4] CPUMINER --debug OUTPUT ===" >> $LOG
+          if [ ! -f /tmp/cpuminer/minerd ]; then
+            echo "MINE_RESULT=SKIP_NO_BINARY" >> $LOG
+          else
+            timeout $DURATION /tmp/cpuminer/minerd \
+              --algo $ALGO \
+              --url  stratum+tcp://$HOST:$PORT \
+              --user ${{ github.event.inputs.stratum_user }} \
+              --pass ${{ github.event.inputs.stratum_pass }} \
+              --threads $(nproc) \
+              --timeout 300 --retries -1 --retry-pause 10 --reconnect --debug \
+              2>&1 | tee -a $LOG || true
+            echo "mine_exit=$?" >> $LOG
+          fi
 
-      - name: "[4] Parse results + write summary"
+      - name: "[5] Parse results + write summary"
         if: always()
         run: |
           LOG=/tmp/diag/bench-debug.log
-          echo "=== [4] PARSED SUMMARY ===" >> $LOG
-          TCP_AUTH=$(grep 'TCP_AUTH=' $LOG | cut -d= -f2)
-          BUILD_OK=$(grep 'build_exit=' $LOG | cut -d= -f2)
-          MINE_EXIT=$(grep 'mine_exit=' $LOG | tail -1 | cut -d= -f2)
+          DNS_RESOLVE=$(grep 'DNS_RESOLVE=' $LOG | cut -d= -f2)
+          TCP_CONNECT=$(grep 'TCP_CONNECT=' $LOG | cut -d= -f2)
+          STRATUM_AUTH=$(grep 'STRATUM_AUTH=' $LOG | head -1 | cut -d= -f2-)
+          BUILD_RESULT=$(grep 'BUILD_RESULT=' $LOG | cut -d= -f2)
           HASHRATE=$(grep -oP '[\d.]+\s*(kH|MH|GH|H)/s' $LOG | tail -1)
-          ACCEPTED=$(grep -ci 'accepted' $LOG || echo 0)
-          ERRORS=$(grep -ci 'error\|disconnected\|rejected\|failed' $LOG || echo 0)
-          LAST_ERROR=$(grep -i 'error\|disconnected\|rejected\|failed' $LOG | tail -3)
-          CPU_SIMD=$(grep 'cpu_simd=' $LOG | cut -d= -f2)
-
-          echo "tcp_auth     : $TCP_AUTH"  >> $LOG
-          echo "build_exit   : $BUILD_OK"  >> $LOG
-          echo "mine_exit    : $MINE_EXIT" >> $LOG
-          echo "hashrate     : $HASHRATE"  >> $LOG
-          echo "shares       : $ACCEPTED"  >> $LOG
-          echo "errors       : $ERRORS"    >> $LOG
-          echo "simd_active  : $CPU_SIMD"  >> $LOG
-
+          ACCEPTED=$(grep -ci 'yay!!!' $LOG 2>/dev/null || echo 0)
+          REJECTED=$(grep -ci 'booooo' $LOG 2>/dev/null || echo 0)
+          ERRORS=$(grep -ci 'error\|disconnected\|failed' $LOG 2>/dev/null || echo 0)
+          LAST_ERRORS=$(grep -i 'error\|disconnected\|failed' $LOG | tail -5)
+          CPU_SIMD=$(grep 'cpu_flags:' $LOG | cut -d: -f2-)
           cat >> $GITHUB_STEP_SUMMARY << SUMMARY
 ## GitMine Bench Debug Results
 | Check | Result |
 |---|---|
-| TCP Auth | $TCP_AUTH |
-| Build Exit | $BUILD_OK |
-| Mine Exit | $MINE_EXIT |
+| DNS Resolve | $DNS_RESOLVE |
+| TCP Connect | $TCP_CONNECT |
+| Stratum Auth | $STRATUM_AUTH |
+| Build | $BUILD_RESULT |
 | Hashrate | $HASHRATE |
 | Shares Accepted | $ACCEPTED |
-| Error Count | $ERRORS |
-| SIMD Active | $CPU_SIMD |
-
-### Last Errors
+| Shares Rejected | $REJECTED |
+| Error Lines | $ERRORS |
+| SIMD Flags | $CPU_SIMD |
+### Last Error Lines
 \`\`\`
-$LAST_ERROR
+$LAST_ERRORS
 \`\`\`
+> Fennec (FNNC) / Trinity (TTY) use external Stratum pools. No GitMine wallet config required.
 SUMMARY
           cat $LOG
 
