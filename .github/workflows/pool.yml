@@ -48,7 +48,9 @@ jobs:
           cache: 'pip'
 
       - name: Install pool operator dependencies
-        run: pip install -r scripts/requirements.txt
+        run: |
+          pip install -r scripts/requirements.txt
+          pip install yescrypt 2>/dev/null || echo "[info] yescrypt C binding unavailable — SHA256d path unaffected, FNNC share verify will use fallback"
 
       # ── Inject payout addresses into config at runtime (never committed) ──
       - name: Inject payout addresses
@@ -73,17 +75,10 @@ jobs:
           FNNC_USER=$(python -c "import yaml; c=yaml.safe_load(open('config/pool.yaml')); print(c['coins']['fnnc']['rpc']['user'])")
           FNNC_PASS=$(python -c "import yaml; c=yaml.safe_load(open('config/pool.yaml')); print(c['coins']['fnnc']['rpc']['pass'])")
           FNNC_PORT=$(python -c "import yaml; c=yaml.safe_load(open('config/pool.yaml')); print(c['coins']['fnnc']['rpc']['port'])")
-          ~/.fennecd/fennecd \
-            -prune=550 \
-            -rpcbind=127.0.0.1 \
-            -rpcport="$FNNC_PORT" \
-            -rpcuser="$FNNC_USER" \
-            -rpcpassword="$FNNC_PASS" \
-            -daemon
+          ~/.fennecd/fennecd             -prune=550             -rpcbind=127.0.0.1             -rpcport="$FNNC_PORT"             -rpcuser="$FNNC_USER"             -rpcpassword="$FNNC_PASS"             -daemon
           for i in $(seq 1 12); do
             sleep 5
-            ~/.fennecd/fennecd-cli -rpcport="$FNNC_PORT" -rpcuser="$FNNC_USER" \
-              -rpcpassword="$FNNC_PASS" getblockcount && break || true
+            ~/.fennecd/fennecd-cli -rpcport="$FNNC_PORT" -rpcuser="$FNNC_USER"               -rpcpassword="$FNNC_PASS" getblockcount && break || true
           done
 
       # ── Trinity daemon ────────────────────────────────────────
@@ -103,17 +98,10 @@ jobs:
           TTY_USER=$(python -c "import yaml; c=yaml.safe_load(open('config/pool.yaml')); print(c['coins']['tty']['rpc']['user'])")
           TTY_PASS=$(python -c "import yaml; c=yaml.safe_load(open('config/pool.yaml')); print(c['coins']['tty']['rpc']['pass'])")
           TTY_PORT=$(python -c "import yaml; c=yaml.safe_load(open('config/pool.yaml')); print(c['coins']['tty']['rpc']['port'])")
-          ~/.trinityd/trinityd \
-            -prune=550 \
-            -rpcbind=127.0.0.1 \
-            -rpcport="$TTY_PORT" \
-            -rpcuser="$TTY_USER" \
-            -rpcpassword="$TTY_PASS" \
-            -daemon
+          ~/.trinityd/trinityd             -prune=550             -rpcbind=127.0.0.1             -rpcport="$TTY_PORT"             -rpcuser="$TTY_USER"             -rpcpassword="$TTY_PASS"             -daemon
           for i in $(seq 1 12); do
             sleep 5
-            ~/.trinityd/trinityd-cli -rpcport="$TTY_PORT" -rpcuser="$TTY_USER" \
-              -rpcpassword="$TTY_PASS" getblockcount && break || true
+            ~/.trinityd/trinityd-cli -rpcport="$TTY_PORT" -rpcuser="$TTY_USER"               -rpcpassword="$TTY_PASS" getblockcount && break || true
           done
 
       # ── Pool logic ───────────────────────────────────────────────
@@ -131,8 +119,7 @@ jobs:
 
       - name: Process payouts
         run: |
-          FORCE_PAYOUT=${{ inputs.force_payout || 'false' }} \
-            python scripts/process_payouts.py
+          FORCE_PAYOUT=${{ inputs.force_payout || 'false' }}             python scripts/process_payouts.py
 
       - name: Commit updated state
         run: |
@@ -157,10 +144,7 @@ jobs:
           COIN=$(python -c "import json; print(json.load(open('docs/template.json'))['coin'])")
           HEIGHT=$(python -c "import json; print(json.load(open('docs/template.json'))['height'])")
           ALGO=$(python -c "import json; print(json.load(open('docs/template.json'))['algo'])")
-          curl -s -X POST "${{ env.RELAY_URL }}/broadcast" \
-            -H "Authorization: Bearer ${{ env.RELAY_SECRET }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"type\":\"state_update\",\"coin\":\"${COIN}\",\"algo\":\"${ALGO}\",\"height\":${HEIGHT}}" || true
+          curl -s -X POST "${{ env.RELAY_URL }}/broadcast"             -H "Authorization: Bearer ${{ env.RELAY_SECRET }}"             -H "Content-Type: application/json"             -d "{"type":"state_update","coin":"${COIN}","algo":"${ALGO}","height":${HEIGHT}}" || true
 
       - name: Deploy dashboard to GitHub Pages
         uses: actions/deploy-pages@v4
